@@ -1,0 +1,461 @@
+# Copyright (C) 2026 FinLinks
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: FinLinks Stablecoin Payments for Easy Digital Downloads 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/finlinks-stablecoin-payments-for-edd\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-10-26T07:58:53+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: finlinks-stablecoin-payments-for-edd\n"
+
+#. Plugin Name of the plugin
+#: finlinks-stablecoin-payments-for-edd.php
+msgid "FinLinks Stablecoin Payments for Easy Digital Downloads"
+msgstr ""
+
+#. Description of the plugin
+#: finlinks-stablecoin-payments-for-edd.php
+msgid "Accept USDC through FinLinks hosted checkout with verified payment confirmation."
+msgstr ""
+
+#. Author of the plugin
+#: finlinks-stablecoin-payments-for-edd.php
+msgid "FinLinks"
+msgstr ""
+
+#: includes/class-bootstrap.php:65
+msgid "FinLinks requires Easy Digital Downloads 3.0 or newer. No payment gateway has been activated."
+msgstr ""
+
+#: includes/class-bootstrap.php:70
+msgid "FinLinks EDD: every ten minutes"
+msgstr ""
+
+#: includes/class-bootstrap.php:109
+msgid "Settings"
+msgstr ""
+
+#: includes/class-gateway.php:25
+#: includes/class-settings.php:72
+msgid "FinLinks USDC"
+msgstr ""
+
+#: includes/class-gateway.php:26
+msgid "Pay with USDC"
+msgstr ""
+
+#: includes/class-gateway.php:43
+msgid "You will be redirected to the official FinLinks hosted page to pay with USDC. Your download becomes available only after payment confirmation."
+msgstr ""
+
+#: includes/class-gateway.php:63
+msgid "Checkout verification failed. Reload the checkout page."
+msgstr ""
+
+#: includes/class-gateway.php:97
+msgid "This checkout is already being processed. Please wait before trying again."
+msgstr ""
+
+#: includes/class-gateway.php:203
+msgid "USDC checkout could not be started. Please try again or choose another payment method. No payment confirmation has been recorded."
+msgstr ""
+
+#: includes/class-settings.php:82
+msgid "Running connection check…"
+msgstr ""
+
+#: includes/class-settings.php:83
+msgid "The result could not be confirmed. Reload this page before retrying."
+msgstr ""
+
+#: includes/class-settings.php:89
+msgid "You are not allowed to manage payment settings."
+msgstr ""
+
+#: includes/class-settings.php:110
+msgid "Credentials were not saved. Check the key prefix, secret format and EDD test/live mode."
+msgstr ""
+
+#: includes/class-settings.php:114
+msgid "Use an HTTPS non-production API base for EDD test mode."
+msgstr ""
+
+#: includes/class-settings.php:118
+msgid "Settings saved. Register and verify the webhook before enabling this gateway in EDD."
+msgstr ""
+
+#: includes/class-settings.php:146
+msgid "Save valid credentials for the current EDD mode first."
+msgstr ""
+
+#: includes/class-settings.php:151
+msgid "Use HTTPS and pretty permalinks for this store webhook."
+msgstr ""
+
+#: includes/class-settings.php:162
+msgid "Unknown connection action."
+msgstr ""
+
+#: includes/class-settings.php:169
+msgid "The test webhook was delivered."
+msgstr ""
+
+#: includes/class-settings.php:170
+msgid "Webhook delivery was not confirmed. Check the store firewall and webhook URL."
+msgstr ""
+
+#. translators: %s: connection status reported by FinLinks.
+#: includes/class-settings.php:178
+#, php-format
+msgid "Connection status: %s."
+msgstr ""
+
+#: includes/class-settings.php:183
+msgid "FinLinks Stablecoin Payments for EDD"
+msgstr ""
+
+#: includes/class-settings.php:189
+msgid "Configure a dedicated FinLinks connection for this EDD store. Enable the gateway separately in Downloads → Settings → Payments. EDD test mode determines the key and API environment."
+msgstr ""
+
+#: includes/class-settings.php:190
+msgid "Webhook URL:"
+msgstr ""
+
+#: includes/class-settings.php:192
+msgid "The webhook event table is unavailable. Payments stay disabled until database setup succeeds."
+msgstr ""
+
+#: includes/class-settings.php:197
+msgid "The server clock differs from the payment service. Correct NTP/time settings to avoid webhook delays."
+msgstr ""
+
+#: includes/class-settings.php:203
+msgid "Allow USDC payments when enabled in EDD"
+msgstr ""
+
+#: includes/class-settings.php:204
+msgid "Mode:"
+msgstr ""
+
+#: includes/class-settings.php:204
+msgid "EDD test mode"
+msgstr ""
+
+#: includes/class-settings.php:204
+msgid "EDD live mode"
+msgstr ""
+
+#: includes/class-settings.php:205
+msgid "API key"
+msgstr ""
+
+#: includes/class-settings.php:205
+msgid "Webhook signing secret"
+msgstr ""
+
+#: includes/class-settings.php:207
+msgid "Saved. Leave blank to retain the current value."
+msgstr ""
+
+#: includes/class-settings.php:207
+msgid "No value saved."
+msgstr ""
+
+#: includes/class-settings.php:208
+msgid "Remove saved value (disable the gateway first)"
+msgstr ""
+
+#: includes/class-settings.php:211
+msgid "Test API base URL"
+msgstr ""
+
+#: includes/class-settings.php:211
+msgid "Required for test mode. Use an HTTPS staging API, never the production API."
+msgstr ""
+
+#: includes/class-settings.php:213
+msgid "Enable redacted EDD diagnostic logging"
+msgstr ""
+
+#: includes/class-settings.php:214
+msgid "Save FinLinks settings"
+msgstr ""
+
+#: includes/class-settings.php:215
+msgid "Connection tools"
+msgstr ""
+
+#: includes/class-settings.php:215
+msgid "Save credentials before running these checks. Registration replaces the webhook URL on this FinLinks connection; do not share a WooCommerce connection."
+msgstr ""
+
+#: includes/class-settings.php:218
+msgid "Test Connection"
+msgstr ""
+
+#: includes/class-settings.php:218
+msgid "Register Webhook & Verify Store"
+msgstr ""
+
+#: includes/class-settings.php:218
+msgid "Test Webhook"
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:30
+msgid "A payment for this order is already in progress. Please contact the store."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:33
+msgid "Too many attempts. Please wait a minute and try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:36
+msgid "USDC payment is not available for this order amount or currency."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:40
+msgid "This order can't be paid with USDC right now. Please choose another payment method."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:45
+msgid "We could not start the USDC payment. Please try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:47
+msgid "USDC payments are temporarily unavailable. Please choose another payment method."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:71
+msgid "Your account is currently not eligible to connect a store. Please contact support."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:73
+msgid "Could not reach the FinLinks API. Try again in a moment."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:75
+msgid "Save the FinLinks API key, then try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:77
+msgid "The FinLinks API key was rejected. Check the key in Downloads > FinLinks USDC and in the FinLinks portal."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:79
+msgid "The API key does not match Test mode. Use an flk_test_ key with Test mode on, or an flk_live_ key with Test mode off."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:81
+msgid "The FinLinks connection is not active. Register the webhook and verify the store, then try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:83
+msgid "USDC payment sessions are turned off for this connection."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:85
+msgid "The webhook is not registered. Use \"Register webhook and verify store\"."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:87
+msgid "The store return or cancel URL was rejected. Use https on this store, with pretty permalinks and no explicit port."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:89
+msgid "The webhook URL was rejected. Use https and pretty permalinks, with no query string."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:92
+msgid "Too many requests to the FinLinks API. Wait a minute and try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:95
+msgid "This FinLinks connection cannot take payments. Check the connection in the FinLinks portal."
+msgstr ""
+
+#. translators: %s: error code
+#: includes/core/class-finlinks-messages.php:99
+#, php-format
+msgid "The FinLinks API could not complete this request (%s)."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:120
+msgid "Store verification failed: the request to your site timed out. Check firewall or Cloudflare rules for /wp-json/."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:123
+msgid "Store verification failed: the payment service could not reach your site. Check firewall or Cloudflare rules for /wp-json/."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:127
+msgid "Store verification failed. Check firewall or Cloudflare rules for /wp-json/."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:130
+msgid "Store verification failed: your site responded, but the response did not match. Check page caching for /wp-json/."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:135
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Check the webhook signing secret."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:142
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Check firewall or Cloudflare rules for /wp-json/."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:149
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Check that pretty permalinks are enabled and /wp-json/ is reachable."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:156
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Check the webhook signing secret and the server clock."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:163
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Redirects are not followed. Check that /wp-json/ answers directly."
+msgstr ""
+
+#. translators: %d: HTTP status returned by this store
+#: includes/core/class-finlinks-messages.php:169
+#, php-format
+msgid "Store verification failed: your site returned HTTP %d. Check that /wp-json/ is reachable."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:226
+msgid "FinLinks could not start the connection. Try again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:228
+msgid "FinLinks could not use this store's settings page as the return address. Paste the API key and webhook signing secret under Advanced."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:230
+msgid "Connect needs an https store address."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:236
+msgid "This connection attempt is no longer valid. Start Connect again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:238
+msgid "This connection attempt expired. Start Connect again."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:240
+msgid "Connect is available for a FinLinks business account."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:242
+msgid "This FinLinks account cannot connect this EDD store."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:244
+msgid "This store is already connected to another FinLinks account."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:246
+msgid "Reconnect this store."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:248
+msgid "The FinLinks account mode does not match test mode in EDD."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:250
+msgid "FinLinks is temporarily unavailable. Try again later."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:252
+msgid "Use the dedicated EDD connection credentials in Downloads > FinLinks USDC."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:254
+msgid "FinLinks returned an unexpected API address. Nothing was saved."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:256
+msgid "FinLinks returned credentials this store cannot save. Nothing was saved."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:258
+msgid "Connection cancelled."
+msgstr ""
+
+#: includes/core/class-finlinks-messages.php:260
+msgid "Click Test connection. If it fails, click Reconnect again."
+msgstr ""
+
+#. translators: 1: session id, 2: session amount, 3: session currency, 4: order total, 5: order currency
+#: includes/core/class-finlinks-session-decider.php:82
+#, php-format
+msgid "USDC payment session %1$s is paid for %2$s %3$s, which does not match the order total %4$s %5$s. Please review before fulfilling."
+msgstr ""
+
+#. translators: 1: session id, 2: order status, 3: transaction hash or "?"
+#: includes/core/class-finlinks-session-decider.php:105
+#, php-format
+msgid "USDC payment session %1$s is paid (transaction %3$s), but the order status is \"%2$s\", so it was not changed. Please review the order."
+msgstr ""
+
+#. translators: 1: session id, 2: transaction hash
+#: includes/core/class-finlinks-session-decider.php:114
+#, php-format
+msgid "USDC payment confirmed (session %1$s, transaction %2$s)."
+msgstr ""
+
+#. translators: %s: session id
+#: includes/core/class-finlinks-session-decider.php:116
+#, php-format
+msgid "USDC payment confirmed (session %s)."
+msgstr ""
+
+#: includes/core/class-finlinks-session-decider.php:118
+msgid "The order had already been cancelled before the payment was confirmed; please check stock."
+msgstr ""
+
+#. translators: 1: USDC received, 2: excess USDC
+#: includes/core/class-finlinks-session-decider.php:123
+#, php-format
+msgid "Overpaid: received %1$s USDC, excess %2$s USDC. Refund the excess from the FinLinks portal if needed."
+msgstr ""
+
+#. translators: 1: session id, 2: USDC received, 3: order amount
+#: includes/core/class-finlinks-session-decider.php:146
+#, php-format
+msgid "USDC payment session %1$s received a partial payment of %2$s USDC of %3$s. The buyer can still pay the rest before the session expires."
+msgstr ""
+
+#. translators: 1: session id, 2: USDC received, 3: order amount
+#: includes/core/class-finlinks-session-decider.php:169
+#, php-format
+msgid "USDC payment session %1$s ended underpaid: received %2$s USDC of %3$s. Settle it manually from the FinLinks portal (refund or accept)."
+msgstr ""
+
+#. translators: %s: session id
+#: includes/core/class-finlinks-session-decider.php:183
+#, php-format
+msgid "USDC payment session %s expired without payment."
+msgstr ""
+
+#. translators: %s: session id
+#: includes/core/class-finlinks-session-decider.php:185
+#, php-format
+msgid "USDC payment session %s was cancelled without payment."
+msgstr ""
