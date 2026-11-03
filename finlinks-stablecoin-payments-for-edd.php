@@ -6,7 +6,8 @@
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Requires Plugins: easy-digital-downloads
- * Author: FinLinks
+ * Author: Finlinks Global Solutions LLC
+ * Author URI: https://www.finlinksglobal.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: finlinks-stablecoin-payments-for-edd

@@ -1,0 +1,23 @@
+# Files omitted by `wp dist-archive`.
+# scripts/build-zip.sh uses an allowlist instead, and the zip root is
+# finlinks-stablecoin-payments-for-edd/ with the plugin runtime only.
+
+/.git
+/.github
+/.gitignore
+/.gitattributes
+/.distignore
+/docs
+/dist
+/scripts
+/tests
+/phpcs.xml
+/phpcs.xml.dist
+/phpunit.xml
+/phpunit.xml.dist
+/composer.json
+/composer.lock
+/package.json
+/package-lock.json
+*.md
+.DS_Store

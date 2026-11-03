@@ -26,7 +26,7 @@ msgstr ""
 
 #. Author of the plugin
 #: finlinks-stablecoin-payments-for-edd.php
-msgid "FinLinks"
+msgid "Finlinks Global Solutions LLC"
 msgstr ""
 
 #: includes/class-bootstrap.php:65
@@ -79,11 +79,11 @@ msgid "You are not allowed to manage payment settings."
 msgstr ""
 
 #: includes/class-settings.php:110
-msgid "Credentials were not saved. Check the key prefix, secret format and EDD test/live mode."
+msgid "Credentials were not saved. Use Easy Digital Downloads Live mode, with a live FinLinks API key and a webhook signing secret."
 msgstr ""
 
 #: includes/class-settings.php:114
-msgid "Use an HTTPS non-production API base for EDD test mode."
+msgid "That address was not saved. Use Easy Digital Downloads Live mode. Do not enter a custom API URL. Live payments call only https://api.finlinks.io."
 msgstr ""
 
 #: includes/class-settings.php:118
@@ -121,7 +121,7 @@ msgid "FinLinks Stablecoin Payments for EDD"
 msgstr ""
 
 #: includes/class-settings.php:189
-msgid "Configure a dedicated FinLinks connection for this EDD store. Enable the gateway separately in Downloads → Settings → Payments. EDD test mode determines the key and API environment."
+msgid "Use a FinLinks connection for this store with Easy Digital Downloads in Live mode. Enable FinLinks USDC separately under Downloads → Settings → Payments. Do not turn on EDD Test mode, and do not enter a custom API URL."
 msgstr ""
 
 #: includes/class-settings.php:190
@@ -177,7 +177,7 @@ msgid "Test API base URL"
 msgstr ""
 
 #: includes/class-settings.php:211
-msgid "Required for test mode. Use an HTTPS staging API, never the production API."
+msgid "Do not use this field. Turn off EDD Test mode and save a live API key. Live payments call only https://api.finlinks.io."
 msgstr ""
 
 #: includes/class-settings.php:213
@@ -193,7 +193,7 @@ msgid "Connection tools"
 msgstr ""
 
 #: includes/class-settings.php:215
-msgid "Save credentials before running these checks. Registration replaces the webhook URL on this FinLinks connection; do not share a WooCommerce connection."
+msgid "Save credentials before running these checks. Registering the webhook replaces the webhook URL saved on this FinLinks connection."
 msgstr ""
 
 #: includes/class-settings.php:218
@@ -249,7 +249,7 @@ msgid "The FinLinks API key was rejected. Check the key in Downloads > FinLinks 
 msgstr ""
 
 #: includes/core/class-finlinks-messages.php:79
-msgid "The API key does not match Test mode. Use an flk_test_ key with Test mode on, or an flk_live_ key with Test mode off."
+msgid "The FinLinks API key does not match Live mode. Save a live API key with EDD Test mode turned off."
 msgstr ""
 
 #: includes/core/class-finlinks-messages.php:81

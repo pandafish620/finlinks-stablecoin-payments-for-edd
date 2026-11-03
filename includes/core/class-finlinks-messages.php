@@ -76,7 +76,7 @@ final class Finlinks_Messages {
 			case 'COMMERCE_API_KEY_INVALID':
 				return __( 'The FinLinks API key was rejected. Check the key in Downloads > FinLinks USDC and in the FinLinks portal.', 'finlinks-stablecoin-payments-for-edd' );
 			case 'COMMERCE_API_KEY_ENVIRONMENT_MISMATCH':
-				return __( 'The API key does not match Test mode. Use an flk_test_ key with Test mode on, or an flk_live_ key with Test mode off.', 'finlinks-stablecoin-payments-for-edd' );
+				return __( 'The FinLinks API key does not match Live mode. Save a live API key with EDD Test mode turned off.', 'finlinks-stablecoin-payments-for-edd' );
 			case 'COMMERCE_CONNECTION_NOT_ACTIVE':
 				return __( 'The FinLinks connection is not active. Register the webhook and verify the store, then try again.', 'finlinks-stablecoin-payments-for-edd' );
 			case 'COMMERCE_SESSIONS_DISABLED':
