@@ -1,4 +1,4 @@
-=== FinLinks Stablecoin Payments for Easy Digital Downloads ===
+=== FinLinks Stablecoin Payments for EDD ===
 Contributors: pandafish620
 Tags: usdc, payments, easy digital downloads, checkout, stablecoin
 Requires at least: 6.4
@@ -67,7 +67,7 @@ Do not use Easy Digital Downloads Test mode, and do not enter a custom API URL. 
 == Installation ==
 
 1. Install and activate Easy Digital Downloads 3.0 or newer. Set the store currency to USD, turn on pretty permalinks, and serve the site over HTTPS.
-2. In WordPress, open Plugins > Add New, install FinLinks Stablecoin Payments for Easy Digital Downloads, and activate it.
+2. In WordPress, open Plugins > Add New, install FinLinks Stablecoin Payments for EDD, and activate it.
 3. Leave Easy Digital Downloads in Live mode under Downloads > Settings > Payments. Do not turn on Test mode, and do not enter a custom API URL.
 4. Open Downloads > FinLinks USDC. Paste the live API key and webhook signing secret from the FinLinks merchant portal, then save.
 5. Use Test Connection, then Register Webhook & Verify Store, then Test Webhook.

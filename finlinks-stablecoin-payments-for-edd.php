@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: FinLinks Stablecoin Payments for Easy Digital Downloads
+ * Plugin Name: FinLinks Stablecoin Payments for EDD
  * Description: Accept USDC through FinLinks hosted checkout with verified payment confirmation.
  * Version: 1.0.0
  * Requires at least: 6.4
