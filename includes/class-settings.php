@@ -107,11 +107,11 @@ final class Settings {
 			$value = self::post( $key );
 			$next[ $key ] = '1' === self::post( $key . '_clear' ) ? '' : ( '' === $value ? self::get( $key ) : $value );
 			if ( ( 'yes' === $next['enabled'] || '' !== $next[ $key ] ) && '' !== Finlinks_Credentials::save_error( self::test_mode(), $key, $next[ $key ] ) ) {
-				self::notice_redirect( false, __( 'Credentials were not saved. Check the key prefix, secret format and EDD test/live mode.', 'finlinks-stablecoin-payments-for-edd' ) );
+				self::notice_redirect( false, __( 'Credentials were not saved. Use Easy Digital Downloads Live mode, with a live FinLinks API key and a webhook signing secret.', 'finlinks-stablecoin-payments-for-edd' ) );
 			}
 		}
 		if ( self::test_mode() && '' !== $next['api_base'] && '' === Finlinks_Api_Base::resolve( true, $next['api_base'] ) ) {
-			self::notice_redirect( false, __( 'Use an HTTPS non-production API base for EDD test mode.', 'finlinks-stablecoin-payments-for-edd' ) );
+			self::notice_redirect( false, __( 'That address was not saved. Use Easy Digital Downloads Live mode. Do not enter a custom API URL. Live payments call only https://api.finlinks.io.', 'finlinks-stablecoin-payments-for-edd' ) );
 		}
 		update_option( self::OPTION, $next, false );
 		delete_option( self::PAUSE_OPTION );
@@ -186,7 +186,7 @@ final class Settings {
 			delete_transient( 'finlinks_edd_notice_' . get_current_user_id() );
 			echo '<div class="notice ' . esc_attr( $notice[0] ? 'notice-success' : 'notice-error' ) . '"><p>' . esc_html( $notice[1] ) . '</p></div>';
 		}
-		echo '<p>' . esc_html__( 'Configure a dedicated FinLinks connection for this EDD store. Enable the gateway separately in Downloads → Settings → Payments. EDD test mode determines the key and API environment.', 'finlinks-stablecoin-payments-for-edd' ) . '</p>';
+		echo '<p>' . esc_html__( 'Use a FinLinks connection for this store with Easy Digital Downloads in Live mode. Enable FinLinks USDC separately under Downloads → Settings → Payments. Do not turn on EDD Test mode, and do not enter a custom API URL.', 'finlinks-stablecoin-payments-for-edd' ) . '</p>';
 		echo '<p>' . esc_html__( 'Webhook URL:', 'finlinks-stablecoin-payments-for-edd' ) . ' <code>' . esc_html( self::webhook_url() ) . '</code></p>';
 		if ( '1' !== get_option( Bootstrap::DB_OPTION ) ) {
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'The webhook event table is unavailable. Payments stay disabled until database setup succeeds.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></div>';
@@ -208,11 +208,11 @@ final class Settings {
 			echo '<label><input type="checkbox" name="' . esc_attr( $key . '_clear' ) . '" value="1"> ' . esc_html__( 'Remove saved value (disable the gateway first)', 'finlinks-stablecoin-payments-for-edd' ) . '</label></td></tr>';
 		}
 		if ( self::test_mode() ) {
-			echo '<tr><th><label for="finlinks_edd_api_base">' . esc_html__( 'Test API base URL', 'finlinks-stablecoin-payments-for-edd' ) . '</label></th><td><input class="regular-text" type="url" id="finlinks_edd_api_base" name="api_base" value="' . esc_attr( self::get( 'api_base' ) ) . '"><p class="description">' . esc_html__( 'Required for test mode. Use an HTTPS staging API, never the production API.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></td></tr>';
+			echo '<tr><th><label for="finlinks_edd_api_base">' . esc_html__( 'Test API base URL', 'finlinks-stablecoin-payments-for-edd' ) . '</label></th><td><input class="regular-text" type="url" id="finlinks_edd_api_base" name="api_base" value="' . esc_attr( self::get( 'api_base' ) ) . '"><p class="description">' . esc_html__( 'Do not use this field. Turn off EDD Test mode and save a live API key. Live payments call only https://api.finlinks.io.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></td></tr>';
 		}
 		echo '</tbody></table><p><label><input type="checkbox" name="debug" value="yes" ' . checked( self::get( 'debug' ), 'yes', false ) . '> ' . esc_html__( 'Enable redacted EDD diagnostic logging', 'finlinks-stablecoin-payments-for-edd' ) . '</label></p>';
 		submit_button( __( 'Save FinLinks settings', 'finlinks-stablecoin-payments-for-edd' ) );
-		echo '</form><h2>' . esc_html__( 'Connection tools', 'finlinks-stablecoin-payments-for-edd' ) . '</h2><p>' . esc_html__( 'Save credentials before running these checks. Registration replaces the webhook URL on this FinLinks connection; do not share a WooCommerce connection.', 'finlinks-stablecoin-payments-for-edd' ) . '</p>';
+		echo '</form><h2>' . esc_html__( 'Connection tools', 'finlinks-stablecoin-payments-for-edd' ) . '</h2><p>' . esc_html__( 'Save credentials before running these checks. Registering the webhook replaces the webhook URL saved on this FinLinks connection.', 'finlinks-stablecoin-payments-for-edd' ) . '</p>';
 		echo '<form class="finlinks-edd-tools" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="finlinks_edd_tools">';
 		wp_nonce_field( self::NONCE, 'nonce' );
 		foreach ( array( 'test' => __( 'Test Connection', 'finlinks-stablecoin-payments-for-edd' ), 'register' => __( 'Register Webhook & Verify Store', 'finlinks-stablecoin-payments-for-edd' ), 'ping' => __( 'Test Webhook', 'finlinks-stablecoin-payments-for-edd' ) ) as $value => $label ) {
