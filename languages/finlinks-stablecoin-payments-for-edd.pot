@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: FinLinks Stablecoin Payments for Easy Digital Downloads 1.0.0\n"
+"Project-Id-Version: FinLinks Stablecoin Payments for EDD 1.0.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/finlinks-stablecoin-payments-for-edd\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,7 +16,8 @@ msgstr ""
 
 #. Plugin Name of the plugin
 #: finlinks-stablecoin-payments-for-edd.php
-msgid "FinLinks Stablecoin Payments for Easy Digital Downloads"
+#: includes/class-settings.php:183
+msgid "FinLinks Stablecoin Payments for EDD"
 msgstr ""
 
 #. Description of the plugin
@@ -114,10 +115,6 @@ msgstr ""
 #: includes/class-settings.php:178
 #, php-format
 msgid "Connection status: %s."
-msgstr ""
-
-#: includes/class-settings.php:183
-msgid "FinLinks Stablecoin Payments for EDD"
 msgstr ""
 
 #: includes/class-settings.php:189
