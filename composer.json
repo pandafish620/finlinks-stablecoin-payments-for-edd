@@ -1,0 +1,15 @@
+{
+	"name": "finlinks/stablecoin-payments-for-edd",
+	"description": "Development checks for FinLinks Stablecoin Payments for EDD. Not part of the WordPress.org zip.",
+	"require-dev": {
+		"phpunit/phpunit": "^9.6",
+		"wp-coding-standards/wpcs": "^3.1",
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+		"phpcompatibility/phpcompatibility-wp": "^2.1"
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	}
+}

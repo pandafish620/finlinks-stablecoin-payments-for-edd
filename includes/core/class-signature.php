@@ -2,10 +2,10 @@
 /**
  * Webhook signature verification (contract §7.3). Pure PHP, no WordPress.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * Finlinks-Signature = hex HMAC-SHA256(secret, "{Finlinks-Timestamp}.{raw body}").
  * The key is the webhook secret string as shown, i.e. its UTF-8 bytes, never base64url-decoded (§16.3).
  */
-final class Finlinks_Signature {
+final class Signature {
 
 	const OK            = 'ok';
 	const MISSING       = 'missing_headers';

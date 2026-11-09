@@ -9,17 +9,17 @@
  * API can return its own page.
  * Host match in live mode is exact: no subdomain wildcard.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Hosted payment URL allow-list. Pure PHP.
  */
-final class Finlinks_Hosted_Url {
+final class Hosted_Url {
 
 	const PROD_HOST = 'portal.finlinks.io';
 	const PAY_HOST  = 'pay.finlinks.io';
@@ -68,6 +68,12 @@ final class Finlinks_Hosted_Url {
 		if ( isset( $p['user'] ) || isset( $p['pass'] ) || isset( $p['port'] ) || isset( $p['fragment'] ) ) {
 			return array(
 				'reason' => 'userinfo, port, or fragment',
+				'host'   => $host,
+			);
+		}
+		if ( Host_Policy::is_blocked( (string) $p['host'] ) ) {
+			return array(
+				'reason' => 'blocked host',
 				'host'   => $host,
 			);
 		}

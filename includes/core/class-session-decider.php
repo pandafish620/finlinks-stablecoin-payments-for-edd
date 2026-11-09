@@ -2,17 +2,17 @@
 /**
  * Maps a confirmed session (contract §6.1) to a e-commerce order action. Pure PHP; only needs __() (stubbed in unit tests).
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Decides what to do with an order given the session object returned by GET /api/v1/commerce/sessions/:id.
  */
-final class Finlinks_Session_Decider {
+final class Session_Decider {
 
 	const STATUSES = array( 'open', 'paid', 'expired', 'failed', 'cancelled' );
 
@@ -68,7 +68,7 @@ final class Finlinks_Session_Decider {
 		}
 
 		if ( 'paid' === $status ) {
-			$amount_ok   = isset( $session['amount'] ) && Finlinks_Amount::equals( $session['amount'], $ctx['order_total'] );
+			$amount_ok   = isset( $session['amount'] ) && Amount::equals( $session['amount'], $ctx['order_total'] );
 			$currency_ok = isset( $session['currency'] ) && strtoupper( (string) $session['currency'] ) === strtoupper( (string) $ctx['order_currency'] );
 			if ( ! $amount_ok || ! $currency_ok ) {
 				if ( 'paid_mismatch' === ( isset( $ctx['last_status'] ) ? $ctx['last_status'] : '' ) ) {
@@ -80,17 +80,17 @@ final class Finlinks_Session_Decider {
 					sprintf(
 						/* translators: 1: session id, 2: session amount, 3: session currency, 4: order total, 5: order currency */
 						__( 'USDC payment session %1$s is paid for %2$s %3$s, which does not match the order total %4$s %5$s. Please review before fulfilling.', 'finlinks-stablecoin-payments-for-edd' ),
-						$id,
-						isset( $session['amount'] ) ? (string) $session['amount'] : '?',
-						isset( $session['currency'] ) ? (string) $session['currency'] : '?',
-						(string) $ctx['order_total'],
-						(string) $ctx['order_currency']
+						self::display_id( $id ),
+						self::display_amount( isset( $session['amount'] ) ? $session['amount'] : '' ),
+						self::display_currency( isset( $session['currency'] ) ? $session['currency'] : '' ),
+						self::display_amount( $ctx['order_total'] ),
+						self::display_currency( $ctx['order_currency'] )
 					)
 				);
 			}
-			$tx       = isset( $session['txHash'] ) && is_string( $session['txHash'] ) ? $session['txHash'] : '';
+			$tx       = self::display_tx( isset( $session['txHash'] ) ? $session['txHash'] : '' );
 			$overpaid = ! empty( $session['overpaid'] );
-			$payable = isset( $ctx['payable_statuses'] ) && is_array( $ctx['payable_statuses'] ) ? $ctx['payable_statuses'] : self::PAYABLE_ORDER_STATUSES;
+			$payable  = isset( $ctx['payable_statuses'] ) && is_array( $ctx['payable_statuses'] ) ? $ctx['payable_statuses'] : self::PAYABLE_ORDER_STATUSES;
 			if ( ! in_array( (string) $ctx['order_status'], $payable, true ) ) {
 				// e.g. refunded, draft or a custom status: payment_complete() would not move the order,
 				// so record the payment once and let the merchant decide.
@@ -103,17 +103,17 @@ final class Finlinks_Session_Decider {
 					sprintf(
 						/* translators: 1: session id, 2: order status, 3: transaction hash or "?" */
 						__( 'USDC payment session %1$s is paid (transaction %3$s), but the order status is "%2$s", so it was not changed. Please review the order.', 'finlinks-stablecoin-payments-for-edd' ),
-						$id,
-						(string) $ctx['order_status'],
+						self::display_id( $id ),
+						self::display_status( $ctx['order_status'] ),
 						'' !== $tx ? $tx : '?'
 					)
 				);
 			}
 			$note = '' !== $tx
 				/* translators: 1: session id, 2: transaction hash */
-				? sprintf( __( 'USDC payment confirmed (session %1$s, transaction %2$s).', 'finlinks-stablecoin-payments-for-edd' ), $id, $tx )
+				? sprintf( __( 'USDC payment confirmed (session %1$s, transaction %2$s).', 'finlinks-stablecoin-payments-for-edd' ), self::display_id( $id ), $tx )
 				/* translators: %s: session id */
-				: sprintf( __( 'USDC payment confirmed (session %s).', 'finlinks-stablecoin-payments-for-edd' ), $id );
+				: sprintf( __( 'USDC payment confirmed (session %s).', 'finlinks-stablecoin-payments-for-edd' ), self::display_id( $id ) );
 			if ( 'cancelled' === $ctx['order_status'] ) {
 				$note .= ' ' . __( 'The order had already been cancelled before the payment was confirmed; please check stock.', 'finlinks-stablecoin-payments-for-edd' );
 			}
@@ -121,8 +121,8 @@ final class Finlinks_Session_Decider {
 				$note .= ' ' . sprintf(
 					/* translators: 1: USDC received, 2: excess USDC */
 					__( 'Overpaid: received %1$s USDC, excess %2$s USDC. Refund the excess from the FinLinks portal if needed.', 'finlinks-stablecoin-payments-for-edd' ),
-					isset( $session['amountReceived'] ) ? (string) $session['amountReceived'] : '?',
-					isset( $session['remainderAmount'] ) ? (string) $session['remainderAmount'] : '?'
+					self::display_amount( isset( $session['amountReceived'] ) ? $session['amountReceived'] : '' ),
+					self::display_amount( isset( $session['remainderAmount'] ) ? $session['remainderAmount'] : '' )
 				);
 			}
 			$out             = self::r( self::ACTION_COMPLETE, 'paid', $note );
@@ -134,7 +134,7 @@ final class Finlinks_Session_Decider {
 		if ( 'open' === $status ) {
 			// §6.2: a partial payment sends no event; the poll sees it as open with amountReceived > 0.
 			// Record it once on the current session so the merchant knows money has arrived.
-			$received = isset( $session['amountReceived'] ) ? Finlinks_Amount::normalize( $session['amountReceived'] ) : null;
+			$received = isset( $session['amountReceived'] ) ? Amount::normalize( $session['amountReceived'] ) : null;
 			if ( null !== $received && '0' !== $received
 				&& (string) $ctx['current_session_id'] === $id
 				&& 'partial' !== ( isset( $ctx['last_status'] ) ? $ctx['last_status'] : '' ) ) {
@@ -144,9 +144,9 @@ final class Finlinks_Session_Decider {
 					sprintf(
 						/* translators: 1: session id, 2: USDC received, 3: order amount */
 						__( 'USDC payment session %1$s received a partial payment of %2$s USDC of %3$s. The buyer can still pay the rest before the session expires.', 'finlinks-stablecoin-payments-for-edd' ),
-						$id,
-						(string) $session['amountReceived'],
-						isset( $session['amount'] ) ? (string) $session['amount'] : '?'
+						self::display_id( $id ),
+						self::display_amount( $session['amountReceived'] ),
+						self::display_amount( isset( $session['amount'] ) ? $session['amount'] : '' )
 					)
 				);
 			}
@@ -167,9 +167,9 @@ final class Finlinks_Session_Decider {
 			$note = sprintf(
 				/* translators: 1: session id, 2: USDC received, 3: order amount */
 				__( 'USDC payment session %1$s ended underpaid: received %2$s USDC of %3$s. Settle it manually from the FinLinks portal (refund or accept).', 'finlinks-stablecoin-payments-for-edd' ),
-				$id,
-				isset( $session['amountReceived'] ) ? (string) $session['amountReceived'] : '?',
-				isset( $session['amount'] ) ? (string) $session['amount'] : '?'
+				self::display_id( $id ),
+				self::display_amount( isset( $session['amountReceived'] ) ? $session['amountReceived'] : '' ),
+				self::display_amount( isset( $session['amount'] ) ? $session['amount'] : '' )
 			);
 			if ( in_array( $order_status, array( 'pending', 'failed', 'cancelled' ), true ) ) {
 				return self::r( self::ACTION_HOLD, 'failed', $note );
@@ -178,11 +178,11 @@ final class Finlinks_Session_Decider {
 		}
 
 		// expired | cancelled.
-		$note   = 'expired' === $status
+		$note = 'expired' === $status
 			/* translators: %s: session id */
-			? sprintf( __( 'USDC payment session %s expired without payment.', 'finlinks-stablecoin-payments-for-edd' ), $id )
+			? sprintf( __( 'USDC payment session %s expired without payment.', 'finlinks-stablecoin-payments-for-edd' ), self::display_id( $id ) )
 			/* translators: %s: session id */
-			: sprintf( __( 'USDC payment session %s was cancelled without payment.', 'finlinks-stablecoin-payments-for-edd' ), $id );
+			: sprintf( __( 'USDC payment session %s was cancelled without payment.', 'finlinks-stablecoin-payments-for-edd' ), self::display_id( $id ) );
 		$action = isset( $ctx['unpaid_action'] ) ? $ctx['unpaid_action'] : self::UNPAID_NONE;
 		if ( 'pending' === $order_status && self::UNPAID_CANCEL === $action ) {
 			return self::r( self::ACTION_CANCEL, $status, $note );
@@ -210,5 +210,58 @@ final class Finlinks_Session_Decider {
 			$out['note'] = $note;
 		}
 		return $out;
+	}
+
+	/**
+	 * Session id safe to place in an order note.
+	 *
+	 * @param string $value Raw id.
+	 * @return string
+	 */
+	private static function display_id( $value ) {
+		return is_string( $value ) && 1 === preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $value ) ? $value : '?';
+	}
+
+	/**
+	 * Decimal amount safe to place in an order note.
+	 *
+	 * @param mixed $value Raw amount.
+	 * @return string
+	 */
+	private static function display_amount( $value ) {
+		$value = trim( (string) $value );
+		return 1 === preg_match( '/^\d{1,12}(?:\.\d{1,8})?$/', $value ) ? $value : '?';
+	}
+
+	/**
+	 * Currency code safe to place in an order note.
+	 *
+	 * @param mixed $value Raw currency.
+	 * @return string
+	 */
+	private static function display_currency( $value ) {
+		$value = strtoupper( trim( (string) $value ) );
+		return 1 === preg_match( '/^[A-Z]{3}$/', $value ) ? $value : '?';
+	}
+
+	/**
+	 * Transaction hash safe to store and show. Empty when the value is not a hash.
+	 *
+	 * @param mixed $value Raw hash.
+	 * @return string
+	 */
+	private static function display_tx( $value ) {
+		return is_string( $value ) && 1 === preg_match( '/^(?:0x)?[A-Za-z0-9]{16,128}$/', $value ) ? $value : '';
+	}
+
+	/**
+	 * Order status safe to place in an order note.
+	 *
+	 * @param mixed $value Raw status.
+	 * @return string
+	 */
+	private static function display_status( $value ) {
+		$value = strtolower( trim( (string) $value ) );
+		return 1 === preg_match( '/^[a-z0-9_-]{1,32}$/', $value ) ? $value : 'unknown';
 	}
 }

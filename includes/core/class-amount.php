@@ -2,17 +2,17 @@
 /**
  * Amount and currency rules (contract §5.2, §15 decision 4). Pure PHP, no WordPress.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Decimal-string helpers. Never uses floats for comparisons.
  */
-final class Finlinks_Amount {
+final class Amount {
 
 	/** Minimum per session, in USD cents (1.00 USD). */
 	const MIN_MINOR = 100;

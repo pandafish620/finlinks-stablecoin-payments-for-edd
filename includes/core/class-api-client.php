@@ -2,10 +2,10 @@
 /**
  * Client for the plugin-side API (contract §4.4, §5). Auth: Bearer API key.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * Thin wp_remote_request wrapper. Responses are normalised to:
  * array{ ok:bool, status:int, data:array, code:string, message:string, network_error:bool }
  */
-final class Finlinks_Api_Client {
+final class Api_Client {
 
 	/** @var string */
 	private $base;
@@ -43,7 +43,7 @@ final class Finlinks_Api_Client {
 			array(
 				'webhookUrl'      => $webhook_url,
 				'platformVersion' => defined( 'EDD_VERSION' ) ? EDD_VERSION : null,
-				'pluginVersion'   => FINLINKS_EDD_VERSION,
+				'pluginVersion'   => FINLSTPA_VERSION,
 			)
 		);
 	}
@@ -90,20 +90,25 @@ final class Finlinks_Api_Client {
 			'headers'     => array(
 				'Authorization' => 'Bearer ' . $this->api_key,
 				'Accept'        => 'application/json',
-				'User-Agent'    => 'FinLinks-Stablecoin-Payments-EDD/' . FINLINKS_EDD_VERSION,
+				'User-Agent'    => 'FinLinks-Stablecoin-Payments-EDD/' . FINLSTPA_VERSION,
 			),
 		);
 		if ( null !== $body && 'GET' !== $method ) {
 			$args['headers']['Content-Type'] = 'application/json';
-			$args['body']                    = wp_json_encode( (object) array_filter( $body, static function ( $v ) {
-				return null !== $v;
-			} ) );
+			$args['body']                    = wp_json_encode(
+				(object) array_filter(
+					$body,
+					static function ( $v ) {
+						return null !== $v;
+					}
+				)
+			);
 		}
 
 		$response = wp_remote_request( $this->base . $path, $args );
 
 		if ( is_wp_error( $response ) ) {
-			Finlinks_Logger::log( sprintf( '%s %s failed: %s', $method, $path, $response->get_error_message() ), 'error' );
+			Logger::log( sprintf( '%s %s failed: %s', $method, $path, $response->get_error_message() ), 'error' );
 			return array(
 				'ok'            => false,
 				'status'        => 0,
@@ -129,7 +134,7 @@ final class Finlinks_Api_Client {
 			'message'       => isset( $decoded['error']['message'] ) ? (string) $decoded['error']['message'] : '',
 			'network_error' => false,
 		);
-		Finlinks_Logger::log( sprintf( '%s %s -> %d %s', $method, $path, $status, $out['code'] ) );
+		Logger::log( sprintf( '%s %s -> %d %s', $method, $path, $status, $out['code'] ) );
 		return $out;
 	}
 
@@ -143,7 +148,7 @@ final class Finlinks_Api_Client {
 		if ( is_array( $date ) ) {
 			$date = reset( $date );
 		}
-		$skew = Finlinks_Timing::skew_from_date_header( $date, time() );
+		$skew = Timing::skew_from_date_header( $date, time() );
 		if ( null === $skew ) {
 			return;
 		}
@@ -151,6 +156,13 @@ final class Finlinks_Api_Client {
 		if ( is_array( $prev ) && isset( $prev['skew'], $prev['at'] ) && abs( $prev['skew'] - $skew ) <= 5 && $prev['at'] > time() - 600 ) {
 			return;
 		}
-		update_option( Settings::CLOCK_OPTION, array( 'skew' => $skew, 'at' => time() ), false );
+		update_option(
+			Settings::CLOCK_OPTION,
+			array(
+				'skew' => $skew,
+				'at'   => time(),
+			),
+			false
+		);
 	}
 }

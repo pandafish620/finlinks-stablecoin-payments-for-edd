@@ -4,7 +4,7 @@ Tags: usdc, payments, easy digital downloads, checkout, stablecoin
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,7 +52,7 @@ Authenticated calls send the API key as a bearer token, an Accept header of appl
 
 Webhook registration sends the store webhook URL, the Easy Digital Downloads version, and the plugin version (PUT /api/v1/commerce/connection/webhook). Connection verification (POST /api/v1/commerce/connection/verify), the connection test (GET /api/v1/commerce/connection), and the test webhook (POST /api/v1/commerce/connection/test-webhook) send those authenticated headers and no order contents.
 
-Creating a payment session (POST /api/v1/commerce/sessions) sends the store order id (edd- followed by the Easy Digital Downloads order number), an order label of the form EDD Order # and that number, the amount, the currency USD, the receipt return URL, the checkout cancel URL, and the webhook URL. The return URL can include the EDD payment key and, when Easy Digital Downloads provides one, a receipt hash and order id. Do not put other personal information in those URLs. Cancelling a replaced session (POST /api/v1/commerce/sessions/{session id}/cancel) and reading a session (GET /api/v1/commerce/sessions/{session id}) send the session id in the path. These calls are used to start payment, confirm it, and update the Easy Digital Downloads order. FinLinks sends signed POST notifications to the store REST address /wp-json/finlinks-edd/v1/webhook. The plugin verifies the raw body before it asks the API for the session.
+Creating a payment session (POST /api/v1/commerce/sessions) sends the store order id (edd- followed by the Easy Digital Downloads order number), an order label of the form EDD Order # and that number, the amount, the currency USD, the receipt return URL, the checkout cancel URL, and the webhook URL. The return URL can include the EDD payment key and, when Easy Digital Downloads provides one, a receipt hash and order id. Do not put other personal information in those URLs. Cancelling a replaced session (POST /api/v1/commerce/sessions/{session id}/cancel) and reading a session (GET /api/v1/commerce/sessions/{session id}) send the session id in the path. These calls are used to start payment, confirm it, and update the Easy Digital Downloads order. FinLinks sends signed POST notifications to the store REST address /wp-json/finlstpa/v1/webhook. A store that already registered /wp-json/finlinks-edd/v1/webhook still accepts signed notifications at that address. The plugin verifies the raw body before it asks the API for the session.
 
 = portal.finlinks.io and pay.finlinks.io =
 
@@ -89,7 +89,7 @@ If the confirmed amount or currency does not match the order, the order stays pe
 
 = Where is the transaction hash stored? =
 
-When the confirmed FinLinks session includes a transaction hash, the plugin stores it as the Easy Digital Downloads transaction ID, in the order meta field _finlinks_edd_transaction_hash, and in the payment note.
+When the confirmed FinLinks session includes a transaction hash, the plugin stores it as the Easy Digital Downloads transaction ID, in the order meta field _finlstpa_transaction_hash, and in the payment note.
 
 = Are refunds supported? =
 
@@ -106,6 +106,13 @@ No. Uninstall deletes this plugin's settings, credentials, and operational data.
 * Email: support@finlinks.io
 
 == Changelog ==
+
+= 1.1.0 =
+* Use the finlstpa prefix for plugin hooks, options, scheduled tasks, and order meta.
+* Move existing API keys, webhook secrets, orders, and payment sessions to the new storage names. Credentials are copied unchanged and are not printed.
+* Keep accepting signed payment notifications at the previously registered webhook address.
+* Require a shop-manager capability and a nonce for settings changes. Checkout and signed payment notifications do not require a WordPress login.
+* Reject local and private hosts for test API addresses and hosted payment redirects.
 
 = 1.0.0 =
 * Initial release for Easy Digital Downloads 3.0 and newer.
