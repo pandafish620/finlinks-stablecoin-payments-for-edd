@@ -35,6 +35,7 @@ Version 1.1.0 moves plugin-owned globals to the `finlstpa` prefix. There are no 
 | option `finlinks_edd_pause` | `finlstpa_pause` |
 | option `finlstpa_schema` | new, value `2` after upgrade |
 | option `finlstpa_orders_schema` | new, value `2` after order upgrade |
+| option `finlstpa_migration_error` | new, empty after a finished upgrade; `credentials_differ`, `credentials_unreadable`, or `event_copy_failed` while the old data is kept |
 | transient `finlinks_edd_notice_{user}` | `finlstpa_notice_{user}` |
 | lock option `finlinks_edd_lock_*` | `finlstpa_lock_*` (old leases are deleted, not copied) |
 | cron hook `finlinks_edd_reconcile` | `finlstpa_reconcile` |

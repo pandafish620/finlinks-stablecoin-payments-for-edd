@@ -37,6 +37,7 @@ function finlstpa_uninstall() {
 				'finlstpa_pause',
 				'finlstpa_clock',
 				'finlstpa_stale_webhook',
+				'finlstpa_migration_error',
 				'finlinks_edd_settings',
 				'finlinks_edd_db_version',
 				'finlinks_edd_pause',

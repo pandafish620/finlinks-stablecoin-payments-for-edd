@@ -83,11 +83,25 @@ final class Api_Client {
 	 * @return array
 	 */
 	private function request( $method, $path, $body = null, $timeout = 15 ) {
+		$url  = $this->base . $path;
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+		if ( ! is_string( $host ) || '' === $host || Host_Policy::destination_blocked( $host ) ) {
+			Logger::log( sprintf( '%s blocked before transport', $method ), 'error' );
+			return array(
+				'ok'            => false,
+				'status'        => 0,
+				'data'          => array(),
+				'code'          => 'blocked_destination',
+				'message'       => '',
+				'network_error' => true,
+			);
+		}
 		$args = array(
-			'method'      => $method,
-			'timeout'     => $timeout,
-			'redirection' => 0,
-			'headers'     => array(
+			'method'             => $method,
+			'timeout'            => $timeout,
+			'redirection'        => 0,
+			'reject_unsafe_urls' => true,
+			'headers'            => array(
 				'Authorization' => 'Bearer ' . $this->api_key,
 				'Accept'        => 'application/json',
 				'User-Agent'    => 'FinLinks-Stablecoin-Payments-EDD/' . FINLSTPA_VERSION,
@@ -105,7 +119,7 @@ final class Api_Client {
 			);
 		}
 
-		$response = wp_remote_request( $this->base . $path, $args );
+		$response = wp_safe_remote_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			Logger::log( sprintf( '%s %s failed: %s', $method, $path, $response->get_error_message() ), 'error' );
@@ -121,7 +135,18 @@ final class Api_Client {
 
 		self::record_clock( wp_remote_retrieve_header( $response, 'date' ) );
 
-		$status  = (int) wp_remote_retrieve_response_code( $response );
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status >= 300 && $status < 400 ) {
+			Logger::log( sprintf( '%s redirect was not followed', $method ), 'error' );
+			return array(
+				'ok'            => false,
+				'status'        => $status,
+				'data'          => array(),
+				'code'          => 'redirect_refused',
+				'message'       => '',
+				'network_error' => true,
+			);
+		}
 		$decoded = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		$decoded = is_array( $decoded ) ? $decoded : array();
 		$ok      = $status >= 200 && $status < 300 && ! empty( $decoded['success'] );

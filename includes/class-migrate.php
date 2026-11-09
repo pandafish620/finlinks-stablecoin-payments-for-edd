@@ -24,6 +24,8 @@ final class Migrate {
 
 	const VERSION = '2';
 
+	const ERROR_OPTION = 'finlstpa_migration_error';
+
 	/**
 	 * Legacy option names deleted after a verified copy.
 	 *
@@ -48,16 +50,46 @@ final class Migrate {
 		if ( ! self::needs_run() ) {
 			return;
 		}
-		Bootstrap::install();
-		self::migrate_events();
-		self::migrate_settings();
-		self::migrate_state_options();
-		self::migrate_cron();
-		self::delete_legacy_locks();
-		if ( function_exists( 'edd_get_order' ) ) {
-			self::migrate_orders();
+		$owned = Lock::acquire( 'migrate' );
+		if ( ! $owned ) {
+			return;
 		}
-		self::maybe_mark_schema();
+		try {
+			if ( ! self::needs_run() ) {
+				return;
+			}
+			Bootstrap::install();
+			self::migrate_events();
+			self::migrate_settings();
+			self::migrate_state_options();
+			self::migrate_cron();
+			self::delete_legacy_locks();
+			if ( function_exists( 'edd_get_order' ) ) {
+				self::migrate_orders();
+			}
+			self::maybe_mark_schema();
+		} finally {
+			Lock::release( $owned );
+		}
+	}
+
+	/**
+	 * Admin notice when an upgrade stopped before deleting the previous data.
+	 *
+	 * @return void
+	 */
+	public static function render_notice() {
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'manage_shop_settings' ) ) {
+			return;
+		}
+		$code = get_option( self::ERROR_OPTION, '' );
+		if ( 'credentials_differ' === $code ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'FinLinks kept the previous store connection because it does not match the connection saved by this version. The previous copy was not deleted and does not contain a displayed secret. Open Downloads → FinLinks USDC, save the API key and webhook secret you intend to use, then reload this screen.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></div>';
+		} elseif ( 'credentials_unreadable' === $code ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'FinLinks could not read the previous store connection. Nothing from that copy was deleted. Open Downloads → FinLinks USDC and save the API key and webhook secret again.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></div>';
+		} elseif ( 'event_copy_failed' === $code ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'FinLinks could not move the previous payment-notification history. That table is still in place and no credentials were removed. Reload this screen to try again.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></div>';
+		}
 	}
 
 	/**
@@ -84,25 +116,44 @@ final class Migrate {
 		if ( $old === $new || ! Bootstrap::table_exists( $old ) || ! Bootstrap::table_exists( $new ) ) {
 			return;
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time copy of plugin-owned rows.
+		$wpdb->last_error = '';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time read of plugin-owned rows.
 		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT event_id, received_at FROM %i', $old ), ARRAY_A );
-		if ( ! is_array( $rows ) ) {
+		if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) ) {
+			self::fail( 'event_copy_failed' );
 			return;
 		}
+		$ids = array();
 		foreach ( $rows as $row ) {
 			if ( ! is_array( $row ) || ! isset( $row['event_id'], $row['received_at'] ) ) {
-				continue;
+				self::fail( 'event_copy_failed' );
+				return;
 			}
 			$id = (string) $row['event_id'];
 			$at = (string) $row['received_at'];
 			if ( ! preg_match( '/^[A-Za-z0-9._:-]{1,64}$/', $id ) || ! preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $at ) ) {
 				continue;
 			}
-			self::insert_event( $new, $id, $at );
+			if ( ! self::insert_event( $new, $id, $at ) ) {
+				self::fail( 'event_copy_failed' );
+				return;
+			}
+			$ids[] = $id;
 		}
-		if ( Bootstrap::table_exists( $new ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Drop only the previous plugin table after the copy.
-			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $old ) );
+		foreach ( $ids as $id ) {
+			if ( ! self::event_present( $new, $id ) ) {
+				self::fail( 'event_copy_failed' );
+				return;
+			}
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Drop the previous table only after every copied id was read back.
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $old ) );
+		if ( Bootstrap::table_exists( $old ) ) {
+			self::fail( 'event_copy_failed' );
+			return;
+		}
+		if ( 'event_copy_failed' === get_option( self::ERROR_OPTION, '' ) ) {
+			delete_option( self::ERROR_OPTION );
 		}
 	}
 
@@ -112,9 +163,12 @@ final class Migrate {
 	 * @param string $table Table.
 	 * @param string $id    Event id.
 	 * @param string $at    Timestamp.
-	 * @return void
+	 * @return bool
 	 */
 	private static function insert_event( $table, $id, $at ) {
+		if ( false === apply_filters( 'finlstpa_migrate_event_insert', true, $id ) ) {
+			return false;
+		}
 		global $wpdb;
 		$wpdb->suppress_errors( true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -123,21 +177,37 @@ final class Migrate {
 		$wpdb->suppress_errors( false );
 		$wpdb->last_error = '';
 		if ( '' === $error ) {
-			return;
+			return self::event_present( $table, $id );
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SELECT event_id FROM %i WHERE event_id = %s', $table, $id ) );
-		if ( $exists !== $id ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Insert a copied webhook claim when INSERT IGNORE is unavailable.
-			$wpdb->insert(
-				$table,
-				array(
-					'event_id'    => $id,
-					'received_at' => $at,
-				),
-				array( '%s', '%s' )
-			);
+		if ( $exists === $id ) {
+			return true;
 		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Insert a copied webhook claim when INSERT IGNORE is unavailable.
+		$inserted = $wpdb->insert(
+			$table,
+			array(
+				'event_id'    => $id,
+				'received_at' => $at,
+			),
+			array( '%s', '%s' )
+		);
+		return false !== $inserted && self::event_present( $table, $id );
+	}
+
+	/**
+	 * Whether an event id is stored.
+	 *
+	 * @param string $table Table.
+	 * @param string $id    Event id.
+	 * @return bool
+	 */
+	private static function event_present( $table, $id ) {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SELECT event_id FROM %i WHERE event_id = %s', $table, $id ) );
+		return $exists === $id;
 	}
 
 	/**
@@ -150,30 +220,74 @@ final class Migrate {
 		if ( ! is_array( $old ) ) {
 			return;
 		}
-		$existing = get_option( Settings::OPTION, false );
-		if ( is_array( $existing ) && ( self::opaque( isset( $existing['api_key'] ) ? $existing['api_key'] : '' ) !== '' || self::opaque( isset( $existing['webhook_secret'] ) ? $existing['webhook_secret'] : '' ) !== '' ) ) {
-			delete_option( 'finlinks_edd_settings' );
+		$old_key    = self::readable_secret( isset( $old['api_key'] ) ? $old['api_key'] : '' );
+		$old_secret = self::readable_secret( isset( $old['webhook_secret'] ) ? $old['webhook_secret'] : '' );
+		if ( null === $old_key || null === $old_secret ) {
+			self::fail( 'credentials_unreadable' );
 			return;
 		}
-		$base     = self::opaque( isset( $old['api_base'] ) ? $old['api_base'] : '' );
-		$resolved = Api_Base::resolve( true, $base );
-		$clean    = array(
-			'enabled'        => ( isset( $old['enabled'] ) && 'yes' === $old['enabled'] ) ? 'yes' : 'no',
-			'debug'          => ( isset( $old['debug'] ) && 'yes' === $old['debug'] ) ? 'yes' : 'no',
-			'api_base'       => ( '' !== $base && untrailingslashit( $base ) === $resolved ) ? $resolved : '',
-			'api_key'        => self::opaque( isset( $old['api_key'] ) ? $old['api_key'] : '' ),
-			'webhook_secret' => self::opaque( isset( $old['webhook_secret'] ) ? $old['webhook_secret'] : '' ),
+		$existing   = get_option( Settings::OPTION, false );
+		$new        = is_array( $existing ) ? $existing : array();
+		$new_key    = self::readable_secret( isset( $new['api_key'] ) ? $new['api_key'] : '' );
+		$new_secret = self::readable_secret( isset( $new['webhook_secret'] ) ? $new['webhook_secret'] : '' );
+		if ( null === $new_key || null === $new_secret ) {
+			self::fail( 'credentials_unreadable' );
+			return;
+		}
+		if ( ( '' !== $new_key && '' !== $old_key && ! hash_equals( $new_key, $old_key ) ) || ( '' !== $new_secret && '' !== $old_secret && ! hash_equals( $new_secret, $old_secret ) ) ) {
+			self::fail( 'credentials_differ' );
+			return;
+		}
+		$merged_key    = '' !== $new_key ? $new_key : $old_key;
+		$merged_secret = '' !== $new_secret ? $new_secret : $old_secret;
+		$base          = self::readable_secret( isset( $old['api_base'] ) ? $old['api_base'] : '' );
+		$new_base      = self::readable_secret( isset( $new['api_base'] ) ? $new['api_base'] : '' );
+		$chosen_base   = is_string( $new_base ) && '' !== $new_base ? $new_base : ( is_string( $base ) ? $base : '' );
+		$resolved      = Api_Base::resolve( true, $chosen_base );
+		$clean         = array(
+			'enabled'        => self::yes_no( is_array( $existing ) && isset( $existing['enabled'] ) ? $existing['enabled'] : ( isset( $old['enabled'] ) ? $old['enabled'] : '' ) ),
+			'debug'          => self::yes_no( is_array( $existing ) && isset( $existing['debug'] ) ? $existing['debug'] : ( isset( $old['debug'] ) ? $old['debug'] : '' ) ),
+			'api_base'       => ( '' !== $chosen_base && untrailingslashit( $chosen_base ) === $resolved ) ? $resolved : '',
+			'api_key'        => $merged_key,
+			'webhook_secret' => $merged_secret,
 		);
 		update_option( Settings::OPTION, $clean, false );
 		$stored = get_option( Settings::OPTION, false );
 		if ( ! is_array( $stored ) ) {
+			self::fail( 'credentials_unreadable' );
 			return;
 		}
 		$stored_key    = isset( $stored['api_key'] ) && is_string( $stored['api_key'] ) ? $stored['api_key'] : '';
 		$stored_secret = isset( $stored['webhook_secret'] ) && is_string( $stored['webhook_secret'] ) ? $stored['webhook_secret'] : '';
-		if ( hash_equals( $clean['api_key'], $stored_key ) && hash_equals( $clean['webhook_secret'], $stored_secret ) ) {
-			delete_option( 'finlinks_edd_settings' );
+		if ( ! hash_equals( $clean['api_key'], $stored_key ) || ! hash_equals( $clean['webhook_secret'], $stored_secret ) ) {
+			self::fail( 'credentials_unreadable' );
+			return;
 		}
+		delete_option( 'finlinks_edd_settings' );
+		$code = get_option( self::ERROR_OPTION, '' );
+		if ( 'credentials_differ' === $code || 'credentials_unreadable' === $code ) {
+			delete_option( self::ERROR_OPTION );
+		}
+	}
+
+	/**
+	 * yes or no.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	private static function yes_no( $value ) {
+		return 'yes' === $value ? 'yes' : 'no';
+	}
+
+	/**
+	 * Record a migration stop without storing credential bytes.
+	 *
+	 * @param string $code Error code.
+	 * @return void
+	 */
+	private static function fail( $code ) {
+		update_option( self::ERROR_OPTION, $code, false );
 	}
 
 	/**
@@ -183,8 +297,25 @@ final class Migrate {
 	 * @return string
 	 */
 	private static function opaque( $value ) {
-		if ( ! is_string( $value ) || strlen( $value ) > 256 || preg_match( '/[\x00-\x1F\x7F]/', $value ) ) {
+		$readable = self::readable_secret( $value );
+		return is_string( $readable ) ? $readable : '';
+	}
+
+	/**
+	 * Secret or URL bytes, '' when empty, or null when the value must not be copied.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string|null
+	 */
+	private static function readable_secret( $value ) {
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+		if ( '' === $value ) {
 			return '';
+		}
+		if ( strlen( $value ) > 256 || preg_match( '/[\x00-\x1F\x7F]/', $value ) ) {
+			return null;
 		}
 		return $value;
 	}
@@ -199,24 +330,34 @@ final class Migrate {
 		self::move_clock( 'finlinks_edd_stale_webhook', Settings::STALE_OPTION );
 		$pause = get_option( 'finlinks_edd_pause', false );
 		if ( false !== $pause ) {
-			$current = get_option( Settings::PAUSE_OPTION, false );
-			if ( false === $current && is_array( $pause ) && isset( $pause['until'] ) && is_numeric( $pause['until'] ) ) {
+			$delete_pause = false;
+			$current      = get_option( Settings::PAUSE_OPTION, false );
+			if ( false !== $current ) {
+				$delete_pause = true;
+			} elseif ( is_array( $pause ) && isset( $pause['until'] ) && is_numeric( $pause['until'] ) ) {
 				$until = (int) $pause['until'];
 				$code  = isset( $pause['code'] ) ? sanitize_key( (string) $pause['code'] ) : '';
 				if ( $until > time() && '' !== $code ) {
-					update_option(
-						Settings::PAUSE_OPTION,
-						array(
-							'until' => $until,
-							'code'  => $code,
-						),
-						false
+					$clean = array(
+						'until' => $until,
+						'code'  => $code,
 					);
+					update_option( Settings::PAUSE_OPTION, $clean, false );
+					$stored       = get_option( Settings::PAUSE_OPTION, false );
+					$delete_pause = is_array( $stored ) && (int) $stored['until'] === $until && $stored['code'] === $code;
+				} else {
+					$delete_pause = true;
 				}
+			} else {
+				$delete_pause = true;
 			}
-			delete_option( 'finlinks_edd_pause' );
+			if ( $delete_pause ) {
+				delete_option( 'finlinks_edd_pause' );
+			}
 		}
-		delete_option( 'finlinks_edd_db_version' );
+		if ( '1' === (string) get_option( Bootstrap::DB_OPTION, '' ) && Bootstrap::table_exists( Bootstrap::events_table() ) ) {
+			delete_option( 'finlinks_edd_db_version' );
+		}
 	}
 
 	/**
@@ -231,21 +372,27 @@ final class Migrate {
 		if ( false === $old ) {
 			return;
 		}
-		if ( false === get_option( $new_key, false ) && is_array( $old ) && isset( $old['skew'], $old['at'] ) && is_numeric( $old['skew'] ) && is_numeric( $old['at'] ) ) {
+		$clean = null;
+		if ( is_array( $old ) && isset( $old['skew'], $old['at'] ) && is_numeric( $old['skew'] ) && is_numeric( $old['at'] ) ) {
 			$skew = (int) $old['skew'];
 			$at   = (int) $old['at'];
 			if ( abs( $skew ) <= 7 * DAY_IN_SECONDS && $at >= 0 ) {
-				update_option(
-					$new_key,
-					array(
-						'skew' => $skew,
-						'at'   => $at,
-					),
-					false
+				$clean = array(
+					'skew' => $skew,
+					'at'   => $at,
 				);
 			}
 		}
-		delete_option( $old_key );
+		if ( false === get_option( $new_key, false ) && null !== $clean ) {
+			update_option( $new_key, $clean, false );
+			$stored = get_option( $new_key, false );
+			if ( ! is_array( $stored ) || (int) $stored['skew'] !== $clean['skew'] || (int) $stored['at'] !== $clean['at'] ) {
+				return;
+			}
+		}
+		if ( false !== get_option( $new_key, false ) || null === $clean ) {
+			delete_option( $old_key );
+		}
 	}
 
 	/**
@@ -425,6 +572,9 @@ final class Migrate {
 	 */
 	private static function maybe_mark_schema() {
 		global $wpdb;
+		if ( '' !== (string) get_option( self::ERROR_OPTION, '' ) ) {
+			return;
+		}
 		foreach ( self::legacy_options() as $key ) {
 			if ( false !== get_option( $key, false ) ) {
 				return;

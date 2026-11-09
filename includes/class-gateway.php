@@ -130,7 +130,7 @@ final class Gateway {
 		$host = strtolower( (string) wp_parse_url( $result, PHP_URL_HOST ) );
 		$home = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
 		if ( Hosted_Url::is_allowed( $result, Settings::test_mode() ) ) {
-			if ( ! preg_match( '/^[a-z0-9.-]+$/', $host ) || Host_Policy::is_blocked( $host ) ) {
+			if ( ! preg_match( '/^[a-z0-9.-]+$/', $host ) || Host_Policy::destination_blocked( $host ) ) {
 				edd_set_error( 'finlstpa_checkout', esc_html__( 'USDC checkout could not be started. Please try again or choose another payment method. No payment confirmation has been recorded.', 'finlinks-stablecoin-payments-for-edd' ) );
 				edd_send_back_to_checkout( '?payment-mode=' . self::ID );
 				return;
@@ -193,8 +193,7 @@ final class Gateway {
 			if ( ! is_object( $order ) || self::ID !== $order->gateway || ! hash_equals( (string) $order->payment_key, $key ) || ! Amount::equals( $order->total, $amount ) || strtoupper( (string) edd_get_currency() ) !== strtoupper( (string) $order->currency ) || ( Settings::test_mode() ? 'test' : 'live' ) !== $order->mode ) {
 				return self::error();
 			}
-			$buyer = get_current_user_id();
-			if ( $buyer > 0 && isset( $order->user_id ) && (int) $order->user_id > 0 && (int) $order->user_id !== $buyer ) {
+			if ( ! self::resume_allowed( $order ) ) {
 				return self::error();
 			}
 			if ( 'complete' === $order->status ) {
@@ -258,8 +257,9 @@ final class Gateway {
 			if ( ! is_array( $session ) || ! self::session_matches( $session, $order ) || empty( $session['hostedUrl'] ) || ! is_string( $session['hostedUrl'] ) ) {
 				return self::error();
 			}
-			$hosted = esc_url_raw( $session['hostedUrl'] );
-			if ( ! Hosted_Url::is_allowed( $hosted, Settings::test_mode() ) ) {
+			$hosted      = esc_url_raw( $session['hostedUrl'] );
+			$hosted_host = wp_parse_url( $hosted, PHP_URL_HOST );
+			if ( ! Hosted_Url::is_allowed( $hosted, Settings::test_mode() ) || ! is_string( $hosted_host ) || Host_Policy::destination_blocked( $hosted_host ) ) {
 				return self::error();
 			}
 			$previous = (string) edd_get_order_meta( $order->id, self::SESSION_META, true );
@@ -284,6 +284,23 @@ final class Gateway {
 			}
 			Lock::release( $intent );
 		}
+	}
+
+	/**
+	 * A customer-owned order can be resumed only by that customer.
+	 *
+	 * The lookup key is the EDD payment key, not an order id from the request.
+	 * A guest order (no customer id) may continue when that payment key matches.
+	 *
+	 * @param object $order Order.
+	 * @return bool
+	 */
+	public static function resume_allowed( $order ) {
+		$owner = isset( $order->user_id ) ? (int) $order->user_id : 0;
+		if ( 1 > $owner ) {
+			return true;
+		}
+		return get_current_user_id() === $owner;
 	}
 
 	/**

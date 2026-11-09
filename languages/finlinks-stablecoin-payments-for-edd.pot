@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-09T10:57:11+00:00\n"
+"POT-Creation-Date: 2026-11-09T11:04:56+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: finlinks-stablecoin-payments-for-edd\n"
@@ -35,15 +35,15 @@ msgstr ""
 msgid "https://www.finlinksglobal.com/"
 msgstr ""
 
-#: includes/class-bootstrap.php:144
+#: includes/class-bootstrap.php:145
 msgid "FinLinks requires Easy Digital Downloads 3.0 or newer. No payment gateway has been activated."
 msgstr ""
 
-#: includes/class-bootstrap.php:156
+#: includes/class-bootstrap.php:157
 msgid "FinLinks EDD: every ten minutes"
 msgstr ""
 
-#: includes/class-bootstrap.php:251
+#: includes/class-bootstrap.php:252
 msgid "Settings"
 msgstr ""
 
@@ -67,12 +67,24 @@ msgstr ""
 
 #: includes/class-gateway.php:134
 #: includes/class-gateway.php:149
-#: includes/class-gateway.php:310
+#: includes/class-gateway.php:327
 msgid "USDC checkout could not be started. Please try again or choose another payment method. No payment confirmation has been recorded."
 msgstr ""
 
 #: includes/class-gateway.php:174
 msgid "This checkout is already being processed. Please wait before trying again."
+msgstr ""
+
+#: includes/class-migrate.php:87
+msgid "FinLinks kept the previous store connection because it does not match the connection saved by this version. The previous copy was not deleted and does not contain a displayed secret. Open Downloads → FinLinks USDC, save the API key and webhook secret you intend to use, then reload this screen."
+msgstr ""
+
+#: includes/class-migrate.php:89
+msgid "FinLinks could not read the previous store connection. Nothing from that copy was deleted. Open Downloads → FinLinks USDC and save the API key and webhook secret again."
+msgstr ""
+
+#: includes/class-migrate.php:91
+msgid "FinLinks could not move the previous payment-notification history. That table is still in place and no credentials were removed. Reload this screen to try again."
 msgstr ""
 
 #: includes/class-settings.php:172

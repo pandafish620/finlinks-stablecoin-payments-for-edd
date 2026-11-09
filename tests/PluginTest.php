@@ -7,12 +7,14 @@
 
 use Finlstpa\EDD\Amount;
 use Finlstpa\EDD\Api_Base;
+use Finlstpa\EDD\Api_Client;
 use Finlstpa\EDD\Bootstrap;
 use Finlstpa\EDD\Credentials;
 use Finlstpa\EDD\Event_Store;
 use Finlstpa\EDD\Gateway;
 use Finlstpa\EDD\Host_Policy;
 use Finlstpa\EDD\Hosted_Url;
+use Finlstpa\EDD\Lock;
 use Finlstpa\EDD\Logger;
 use Finlstpa\EDD\Memory_Event_Store;
 use Finlstpa\EDD\Migrate;
@@ -425,6 +427,357 @@ class PluginTest extends WP_UnitTestCase_Shim {
 	}
 
 	/**
+	 * Names that resolve to a private or loopback address are not requested.
+	 *
+	 * @return void
+	 */
+	public function test_transport_rejects_private_resolved_hosts_and_redirects() {
+		$this->assertTrue( Host_Policy::is_blocked( '127.0.0.1' ) );
+		$this->assertTrue( Host_Policy::is_blocked( '::1' ) );
+		$this->assertTrue( Host_Policy::is_blocked( '[::1]' ) );
+		$this->assertTrue( Host_Policy::is_blocked( 'localhost' ) );
+		$this->assertTrue( Host_Policy::is_blocked( 'fe80::1' ) );
+		$this->assertTrue( Host_Policy::destination_blocked( 'localhost' ) );
+		$calls = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$calls ) {
+				$calls++;
+				return new WP_Error( 'finlstpa_test', 'should not run' );
+			}
+		);
+		$blocked = ( new Api_Client( 'https://127.0.0.1', 'flk_test_abcdefghijklmnopqrst' ) )->get_connection();
+		$this->assertSame( 0, $calls );
+		$this->assertSame( 'blocked_destination', $blocked['code'] );
+		remove_all_filters( 'pre_http_request' );
+
+		$private = static function ( $addresses, $host ) {
+			unset( $addresses );
+			if ( 'public.example' === $host ) {
+				return array( '10.1.2.3', '2001:db8::1' );
+			}
+			if ( 'redirect.example' === $host ) {
+				return array( '1.1.1.1' );
+			}
+			return null;
+		};
+		add_filter( 'finlstpa_host_addresses', $private, 5, 2 );
+		$this->assertTrue( Host_Policy::destination_blocked( 'public.example' ) );
+		$redirects = 0;
+		add_filter(
+			'pre_http_request',
+			static function ( $pre, $args, $url ) use ( &$redirects ) {
+				unset( $pre, $args );
+				if ( false === strpos( (string) $url, 'redirect.example' ) ) {
+					return false;
+				}
+				$redirects++;
+				return array(
+					'headers'  => array( 'location' => 'http://127.0.0.1/secret' ),
+					'body'     => '',
+					'response' => array(
+						'code'    => 302,
+						'message' => 'Found',
+					),
+					'cookies'  => array(),
+					'filename' => '',
+				);
+			},
+			10,
+			3
+		);
+		$redirected = ( new Api_Client( 'https://redirect.example', 'flk_test_abcdefghijklmnopqrst' ) )->get_connection();
+		$this->assertSame( 1, $redirects );
+		$this->assertSame( 'redirect_refused', $redirected['code'] );
+		$this->assertFalse( $redirected['ok'] );
+		remove_all_filters( 'pre_http_request' );
+		remove_filter( 'finlstpa_host_addresses', $private, 5 );
+	}
+
+	/**
+	 * A failed event copy keeps the old table and leaves the schema version unset.
+	 *
+	 * @return void
+	 */
+	public function test_event_migration_failure_is_retried_without_dropping_source() {
+		global $wpdb;
+		$old = $wpdb->prefix . 'finlinks_edd_webhook_events';
+		$new = Bootstrap::events_table();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "CREATE TABLE IF NOT EXISTS {$old} (event_id varchar(64) NOT NULL, received_at datetime NOT NULL, PRIMARY KEY (event_id))" );
+		$wpdb->insert(
+			$old,
+			array(
+				'event_id'    => 'evt_migrate_1',
+				'received_at' => '2026-01-01 00:00:00',
+			),
+			array( '%s', '%s' )
+		);
+		delete_option( Migrate::SCHEMA );
+		delete_option( Migrate::ERROR_OPTION );
+		add_filter( 'finlstpa_migrate_event_insert', '__return_false' );
+		Migrate::run();
+		remove_filter( 'finlstpa_migrate_event_insert', '__return_false' );
+		$this->assertSame( 'event_copy_failed', get_option( Migrate::ERROR_OPTION ) );
+		$this->assertNotSame( '2', (string) get_option( Migrate::SCHEMA ) );
+		$this->assertSame( $old, $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old ) ) );
+		Migrate::run();
+		$this->assertNotSame( $old, (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old ) ) );
+		$this->assertSame( 'evt_migrate_1', $wpdb->get_var( $wpdb->prepare( 'SELECT event_id FROM %i WHERE event_id = %s', $new, 'evt_migrate_1' ) ) );
+		$this->assertSame( '2', (string) get_option( Migrate::SCHEMA ) );
+		$this->assertSame( '', (string) get_option( Migrate::ERROR_OPTION, '' ) );
+	}
+
+	/**
+	 * Partial settings are filled. Differing credentials are kept and block the schema flag.
+	 *
+	 * @return void
+	 */
+	public function test_partial_and_conflicting_settings_migration() {
+		$old_key    = 'flk_live_' . str_repeat( 'm', 20 );
+		$other_key  = 'flk_live_' . str_repeat( 'n', 20 );
+		$old_secret = str_repeat( 'p', 24 );
+		delete_option( Migrate::SCHEMA );
+		delete_option( Migrate::ERROR_OPTION );
+		update_option(
+			Settings::OPTION,
+			array(
+				'enabled'        => 'no',
+				'debug'          => 'no',
+				'api_base'       => '',
+				'api_key'        => $other_key,
+				'webhook_secret' => $old_secret,
+			),
+			false
+		);
+		update_option(
+			'finlinks_edd_settings',
+			array(
+				'enabled'        => 'yes',
+				'debug'          => 'no',
+				'api_base'       => '',
+				'api_key'        => $old_key,
+				'webhook_secret' => $old_secret,
+			),
+			false
+		);
+		Migrate::run();
+		$this->assertSame( 'credentials_differ', get_option( Migrate::ERROR_OPTION ) );
+		$this->assertNotSame( '2', (string) get_option( Migrate::SCHEMA ) );
+		$this->assertSame( $other_key, get_option( Settings::OPTION )['api_key'] );
+		$this->assertSame( $old_key, get_option( 'finlinks_edd_settings' )['api_key'] );
+
+		update_option(
+			Settings::OPTION,
+			array(
+				'enabled'        => 'no',
+				'debug'          => 'no',
+				'api_base'       => '',
+				'api_key'        => $old_key,
+				'webhook_secret' => '',
+			),
+			false
+		);
+		Migrate::run();
+		$stored = get_option( Settings::OPTION );
+		$this->assertSame( $old_key, $stored['api_key'] );
+		$this->assertSame( $old_secret, $stored['webhook_secret'] );
+		$this->assertSame( 'no', $stored['enabled'] );
+		$this->assertFalse( get_option( 'finlinks_edd_settings', false ) );
+		$this->assertSame( '', (string) get_option( Migrate::ERROR_OPTION, '' ) );
+	}
+
+	/**
+	 * A second runner waits instead of deleting the source mid-copy.
+	 *
+	 * @return void
+	 */
+	public function test_migration_lock_keeps_source_until_the_holder_finishes() {
+		$key    = 'flk_live_' . str_repeat( 'q', 20 );
+		$secret = str_repeat( 'r', 24 );
+		delete_option( Migrate::SCHEMA );
+		delete_option( Settings::OPTION );
+		update_option(
+			'finlinks_edd_settings',
+			array(
+				'enabled'        => 'yes',
+				'debug'          => 'no',
+				'api_base'       => '',
+				'api_key'        => $key,
+				'webhook_secret' => $secret,
+			),
+			false
+		);
+		$held = Lock::acquire( 'migrate' );
+		$this->assertNotFalse( $held );
+		Migrate::run();
+		$this->assertSame( $key, get_option( 'finlinks_edd_settings' )['api_key'] );
+		Lock::release( $held );
+		Migrate::run();
+		$this->assertFalse( get_option( 'finlinks_edd_settings', false ) );
+		$this->assertSame( $key, get_option( Settings::OPTION )['api_key'] );
+	}
+
+	/**
+	 * Guests and other customers cannot resume someone else's order. A guest order can continue.
+	 *
+	 * @return void
+	 */
+	public function test_checkout_resume_requires_the_customer_or_a_guest_payment_key() {
+		if ( ! function_exists( 'edd_add_order' ) ) {
+			$this->markTestSkipped( 'Easy Digital Downloads is not active.' );
+		}
+		$this->save_settings( str_repeat( 'f', 24 ) );
+		update_option( Bootstrap::DB_OPTION, '1', false );
+		update_option( 'home', 'https://example.test' );
+		update_option( 'siteurl', 'https://example.test' );
+		update_option( 'permalink_structure', '/%postname%/' );
+		$victim = wp_insert_user(
+			array(
+				'user_login' => 'finlstpa_victim_' . strtolower( wp_generate_password( 6, false, false ) ),
+				'user_pass'  => wp_generate_password( 24 ),
+				'user_email' => 'victim-' . wp_rand() . '@example.com',
+				'role'       => 'subscriber',
+			)
+		);
+		$other = wp_insert_user(
+			array(
+				'user_login' => 'finlstpa_other_' . strtolower( wp_generate_password( 6, false, false ) ),
+				'user_pass'  => wp_generate_password( 24 ),
+				'user_email' => 'other-' . wp_rand() . '@example.com',
+				'role'       => 'subscriber',
+			)
+		);
+		$this->assertGreaterThan( 0, (int) $victim );
+		$victim_key = 'edd' . strtolower( wp_generate_password( 20, false, false ) );
+		$victim_id  = edd_add_order(
+			array(
+				'status'      => 'pending',
+				'type'        => 'sale',
+				'gateway'     => Gateway::ID,
+				'mode'        => 'live',
+				'currency'    => 'USD',
+				'subtotal'    => 20,
+				'total'       => 20,
+				'payment_key' => $victim_key,
+				'user_id'     => $victim,
+				'email'       => 'buyer@example.com',
+			)
+		);
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'edd_orders',
+			array( 'user_id' => $victim ),
+			array( 'id' => $victim_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+		wp_cache_flush();
+		wp_set_current_user( 0 );
+		$guest_attempt = Gateway::prepare(
+			array(
+				'price'        => '20.00',
+				'purchase_key' => $victim_key,
+				'order_id'     => $victim_id,
+			)
+		);
+		$this->assertInstanceOf( WP_Error::class, $guest_attempt );
+		$this->assertSame( 'pending', edd_get_order( $victim_id )->status );
+		wp_set_current_user( $other );
+		$auth_attempt = Gateway::prepare(
+			array(
+				'price'        => '20.00',
+				'purchase_key' => $victim_key,
+				'order_id'     => $victim_id,
+			)
+		);
+		$this->assertInstanceOf( WP_Error::class, $auth_attempt );
+		$this->assertSame( 'pending', edd_get_order( $victim_id )->status );
+
+		wp_set_current_user( 0 );
+		$guest_key = 'edd' . strtolower( wp_generate_password( 20, false, false ) );
+		$guest_id  = edd_add_order(
+			array(
+				'status'      => 'pending',
+				'type'        => 'sale',
+				'gateway'     => Gateway::ID,
+				'mode'        => 'live',
+				'currency'    => 'USD',
+				'subtotal'    => 20,
+				'total'       => 20,
+				'payment_key' => $guest_key,
+				'user_id'     => 0,
+				'email'       => 'guest@example.com',
+			)
+		);
+		$sid       = 'sess_guest_1';
+		$hosted    = 'https://pay.finlinks.io/inv/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+		$filter    = $this->mock_api( $guest_id, $sid, $hosted, '20.00' );
+		$continued = Gateway::prepare(
+			array(
+				'price'        => '20.00',
+				'purchase_key' => $guest_key,
+				'order_id'     => $victim_id,
+			)
+		);
+		remove_filter( 'pre_http_request', $filter, 10 );
+		$this->assertSame( $hosted, $continued );
+		$this->assertSame( 'pending', edd_get_order( $victim_id )->status );
+		$this->assertSame( '', (string) edd_get_order_meta( $victim_id, Gateway::SESSION_META, true ) );
+		$this->assertSame( $sid, (string) edd_get_order_meta( $guest_id, Gateway::SESSION_META, true ) );
+	}
+
+	/**
+	 * A signed notification cannot complete a different order or a mismatched amount.
+	 *
+	 * @return void
+	 */
+	public function test_webhook_does_not_pay_the_wrong_order() {
+		if ( ! function_exists( 'edd_add_order' ) ) {
+			$this->markTestSkipped( 'Easy Digital Downloads is not active.' );
+		}
+		$this->save_settings( str_repeat( 'f', 24 ) );
+		$first = $this->pending_order();
+		$second = $this->pending_order();
+		edd_update_order_meta( $first, Gateway::SESSION_META, 'sess_one' );
+		edd_update_order_meta( $second, Gateway::SESSION_META, 'sess_two' );
+		$mismatch = $this->mock_paid( $first, 'sess_one', '9.00' );
+		$this->assertSame( Webhook_Processor::HANDLED, Order_Sync::sync( $first, 'sess_one' ) );
+		$this->assertSame( 'pending', edd_get_order( $first )->status );
+		$this->assertSame( 'paid_mismatch', (string) edd_get_order_meta( $first, Gateway::LAST_META, true ) );
+		$this->assertSame( 'pending', edd_get_order( $second )->status );
+		remove_filter( 'pre_http_request', $mismatch, 10 );
+
+		$third = $this->pending_order();
+		edd_update_order_meta( $third, Gateway::SESSION_META, 'sess_three' );
+		$currency = $this->mock_paid_body(
+			$third,
+			'sess_three',
+			array(
+				'amount'   => '20.00',
+				'currency' => 'EUR',
+			)
+		);
+		$this->assertSame( Webhook_Processor::HANDLED, Order_Sync::sync( $third, 'sess_three' ) );
+		$this->assertSame( 'pending', edd_get_order( $third )->status );
+		$this->assertSame( 'paid_mismatch', (string) edd_get_order_meta( $third, Gateway::LAST_META, true ) );
+		remove_filter( 'pre_http_request', $currency, 10 );
+
+		$wrong = $this->mock_paid( $second, 'sess_two', '20.00' );
+		$this->assertSame( Webhook_Processor::IGNORED, Order_Sync::sync( $first, 'sess_two' ) );
+		$this->assertSame( 'pending', edd_get_order( $first )->status );
+		$this->assertSame( 'pending', edd_get_order( $second )->status );
+		remove_filter( 'pre_http_request', $wrong, 10 );
+
+		$paid = $this->mock_paid( $first, 'sess_one', '20.00' );
+		$this->assertSame( Webhook_Processor::HANDLED, Order_Sync::sync( $first, 'sess_one' ) );
+		$this->assertSame( 'complete', edd_get_order( $first )->status );
+		$this->assertSame( Webhook_Processor::IGNORED, Order_Sync::sync( $first, 'sess_one' ) );
+		$this->assertSame( 'pending', edd_get_order( $second )->status );
+		remove_filter( 'pre_http_request', $paid, 10 );
+	}
+
+	/**
 	 * Signed headers for a raw body.
 	 *
 	 * @param string $secret    Secret.
@@ -531,26 +884,55 @@ class PluginTest extends WP_UnitTestCase_Shim {
 	 * @param string $amount   Amount.
 	 * @return callable
 	 */
-	private function mock_paid( $order_id, $sid, $amount ) {
-		$callback = static function ( $pre, $args, $url ) use ( $order_id, $sid, $amount ) {
-			if ( false === strpos( $url, '/api/v1/commerce/sessions/' . rawurlencode( $sid ) ) ) {
+	private function pending_order() {
+		return edd_add_order(
+			array(
+				'status'      => 'pending',
+				'type'        => 'sale',
+				'gateway'     => Gateway::ID,
+				'mode'        => 'live',
+				'currency'    => 'USD',
+				'subtotal'    => 20,
+				'total'       => 20,
+				'payment_key' => 'edd' . strtolower( wp_generate_password( 20, false, false ) ),
+				'user_id'     => 0,
+				'email'       => 'guest@example.com',
+			)
+		);
+	}
+
+	/**
+	 * Mock a paid session read with extra fields.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $sid      Session id.
+	 * @param array  $extra    Session fields.
+	 * @return callable
+	 */
+	private function mock_paid_body( $order_id, $sid, array $extra ) {
+		$callback = static function ( $pre, $args, $url ) use ( $order_id, $sid, $extra ) {
+			if ( ! is_string( $url ) || false === strpos( $url, '/api/v1/commerce/sessions/' . rawurlencode( $sid ) ) ) {
 				return $pre;
 			}
 			unset( $args );
+			$data = array_merge(
+				array(
+					'id'           => $sid,
+					'storeOrderId' => 'edd-' . $order_id,
+					'livemode'     => true,
+					'amount'       => '20.00',
+					'currency'     => 'USD',
+					'status'       => 'paid',
+					'txHash'       => str_repeat( 'ab', 16 ),
+				),
+				$extra
+			);
 			return array(
 				'headers'  => array( 'date' => gmdate( 'D, d M Y H:i:s' ) . ' GMT' ),
 				'body'     => wp_json_encode(
 					array(
 						'success' => true,
-						'data'    => array(
-							'id'           => $sid,
-							'storeOrderId' => 'edd-' . $order_id,
-							'livemode'     => true,
-							'amount'       => $amount,
-							'currency'     => 'USD',
-							'status'       => 'paid',
-							'txHash'       => str_repeat( 'ab', 16 ),
-						),
+						'data'    => $data,
 					)
 				),
 				'response' => array(
@@ -563,5 +945,23 @@ class PluginTest extends WP_UnitTestCase_Shim {
 		};
 		add_filter( 'pre_http_request', $callback, 10, 3 );
 		return $callback;
+	}
+
+	/**
+	 * Mock a paid session read.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $sid      Session id.
+	 * @param string $amount   Amount.
+	 * @return callable
+	 */
+	private function mock_paid( $order_id, $sid, $amount ) {
+		return $this->mock_paid_body(
+			$order_id,
+			$sid,
+			array(
+				'amount' => $amount,
+			)
+		);
 	}
 }

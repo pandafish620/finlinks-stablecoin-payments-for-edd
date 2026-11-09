@@ -116,6 +116,7 @@ final class Bootstrap {
 	 */
 	public static function init() {
 		Migrate::run();
+		add_action( 'admin_notices', array( Migrate::class, 'render_notice' ) );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_rest' ) );
 		if ( ! defined( 'EDD_VERSION' ) || version_compare( EDD_VERSION, '3.0', '<' ) || ! function_exists( 'edd_get_order' ) ) {
 			add_action( 'admin_notices', array( __CLASS__, 'dependency_notice' ) );

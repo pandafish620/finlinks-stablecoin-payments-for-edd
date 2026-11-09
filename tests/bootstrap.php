@@ -34,6 +34,22 @@ add_filter(
 );
 
 add_filter(
+	'finlstpa_host_addresses',
+	static function ( $addresses, $host ) {
+		if ( null !== $addresses ) {
+			return $addresses;
+		}
+		// The suite must not resolve or contact the payment service. These stand-ins are public addresses.
+		if ( in_array( $host, array( 'api.finlinks.io', 'pay.finlinks.io', 'portal.finlinks.io' ), true ) ) {
+			return array( '1.1.1.1' );
+		}
+		return null;
+	},
+	10,
+	2
+);
+
+add_filter(
 	'wp_redirect',
 	static function ( $location ) {
 		throw new RuntimeException( 'redirect:' . $location );
