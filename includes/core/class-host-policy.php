@@ -70,12 +70,60 @@ final class Host_Policy {
 	 * @return bool
 	 */
 	public static function destination_blocked( $host ) {
+		return self::addresses_blocked( $host, false );
+	}
+
+	/**
+	 * Whether the buyer must not be sent to this host.
+	 *
+	 * Outbound API calls stay fail-closed when DNS returns nothing. A browser
+	 * redirect to the exact production payment host does not: the server is
+	 * not opening a connection. A private or reserved answer is still refused,
+	 * and every other host still fails closed when it does not resolve.
+	 *
+	 * @param string $host Hostname or IP.
+	 * @return bool
+	 */
+	public static function buyer_redirect_blocked( $host ) {
+		return self::addresses_blocked( $host, true );
+	}
+
+	/**
+	 * open, unresolved, private, or name_blocked. No addresses are returned.
+	 *
+	 * @param string $host Hostname or IP.
+	 * @return string
+	 */
+	public static function resolution_state( $host ) {
+		if ( self::is_blocked( $host ) ) {
+			return 'name_blocked';
+		}
+		$addresses = self::addresses_for( $host );
+		if ( ! $addresses ) {
+			return 'unresolved';
+		}
+		foreach ( $addresses as $address ) {
+			if ( ! is_string( $address ) || self::is_blocked( $address ) ) {
+				return 'private';
+			}
+		}
+		return 'open';
+	}
+
+	/**
+	 * Shared address check for outbound requests and buyer redirects.
+	 *
+	 * @param string $host                  Hostname or IP.
+	 * @param bool   $allow_unresolved_pin  Whether an unresolved production payment host may pass.
+	 * @return bool
+	 */
+	private static function addresses_blocked( $host, $allow_unresolved_pin ) {
 		if ( self::is_blocked( $host ) ) {
 			return true;
 		}
 		$addresses = self::addresses_for( $host );
 		if ( ! $addresses ) {
-			return true;
+			return ! ( $allow_unresolved_pin && self::is_pinned_payment_host( $host ) );
 		}
 		foreach ( $addresses as $address ) {
 			if ( ! is_string( $address ) || self::is_blocked( $address ) ) {
@@ -83,6 +131,17 @@ final class Host_Policy {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Exact production payment hosts. Not used to widen the API host.
+	 *
+	 * @param string $host Hostname.
+	 * @return bool
+	 */
+	private static function is_pinned_payment_host( $host ) {
+		$host = strtolower( trim( (string) $host ) );
+		return in_array( $host, array( 'pay.finlinks.io', 'portal.finlinks.io' ), true );
 	}
 
 	/**

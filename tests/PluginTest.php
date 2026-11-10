@@ -9,6 +9,7 @@ use Finlstpa\EDD\Amount;
 use Finlstpa\EDD\Api_Base;
 use Finlstpa\EDD\Api_Client;
 use Finlstpa\EDD\Bootstrap;
+use Finlstpa\EDD\Checkout_Diag;
 use Finlstpa\EDD\Credentials;
 use Finlstpa\EDD\Event_Store;
 use Finlstpa\EDD\Gateway;
@@ -725,6 +726,221 @@ class PluginTest extends WP_UnitTestCase_Shim {
 		$this->assertSame( 'pending', edd_get_order( $victim_id )->status );
 		$this->assertSame( '', (string) edd_get_order_meta( $victim_id, Gateway::SESSION_META, true ) );
 		$this->assertSame( $sid, (string) edd_get_order_meta( $guest_id, Gateway::SESSION_META, true ) );
+	}
+
+	/**
+	 * A $1.10 logged-in checkout records the API code, and an old gateway id can continue.
+	 *
+	 * The fixture uses the create-session envelope from the client contract: success, data,
+	 * livemode boolean, decimal amount, and /inv/{uuid}. It does not call the live API.
+	 *
+	 * @return void
+	 */
+	public function test_checkout_failure_is_redacted_and_legacy_gateway_can_continue() {
+		if ( ! function_exists( 'edd_add_order' ) ) {
+			$this->markTestSkipped( 'Easy Digital Downloads is not active.' );
+		}
+		$secret = str_repeat( 'f', 24 );
+		$email  = 'buyer-' . wp_rand() . '@example.com';
+		$this->save_settings( $secret );
+		update_option( Bootstrap::DB_OPTION, '1', false );
+		update_option( 'home', 'https://example.test' );
+		update_option( 'siteurl', 'https://example.test' );
+		update_option( 'permalink_structure', '/%postname%/' );
+		$edd_settings = get_option( 'edd_settings', array() );
+		if ( ! is_array( $edd_settings ) ) {
+			$edd_settings = array();
+		}
+		$edd_settings['test_mode'] = 0;
+		$edd_settings['currency']  = 'USD';
+		update_option( 'edd_settings', $edd_settings );
+		delete_option( Checkout_Diag::OPTION );
+		delete_option( Settings::PAUSE_OPTION );
+		$key  = 'edd' . strtolower( wp_generate_password( 20, false, false ) );
+		$user = wp_insert_user(
+			array(
+				'user_login' => 'finlstpa_buyer_' . strtolower( wp_generate_password( 6, false, false ) ),
+				'user_pass'  => wp_generate_password( 24 ),
+				'user_email' => $email,
+				'role'       => 'subscriber',
+			)
+		);
+		$this->assertGreaterThan( 0, (int) $user );
+		wp_set_current_user( $user );
+		$order_id = edd_add_order(
+			array(
+				'status'      => 'pending',
+				'type'        => 'sale',
+				'gateway'     => 'finlinks_usdc',
+				'mode'        => 'live',
+				'currency'    => 'USD',
+				'subtotal'    => '1.10',
+				'total'       => '1.10',
+				'payment_key' => $key,
+				'user_id'     => $user,
+				'email'       => $email,
+			)
+		);
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'edd_orders',
+			array( 'user_id' => $user ),
+			array( 'id' => $order_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+		wp_cache_flush();
+		$sid     = '11111111-2222-3333-4444-555555555555';
+		$hosted  = 'https://pay.finlinks.io/inv/' . $sid;
+		$body    = '';
+		$timeout = 0;
+		$filter  = static function ( $pre, $args, $url ) use ( &$body, &$timeout ) {
+			if ( ! is_string( $url ) || false === strpos( $url, '/api/v1/commerce/sessions' ) || ! is_array( $args ) || 'POST' !== $args['method'] ) {
+				return $pre;
+			}
+			$body    = isset( $args['body'] ) ? (string) $args['body'] : '';
+			$timeout = isset( $args['timeout'] ) ? (int) $args['timeout'] : 0;
+			return array(
+				'headers'  => array( 'date' => gmdate( 'D, d M Y H:i:s' ) . ' GMT' ),
+				'body'     => wp_json_encode(
+					array(
+						'success' => false,
+						'code'    => 'COMMERCE_REDIRECT_URL_INVALID',
+					)
+				),
+				'response' => array(
+					'code'    => 422,
+					'message' => 'Unprocessable Entity',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+		add_filter( 'pre_http_request', $filter, 10, 3 );
+		$failed = Gateway::prepare(
+			array(
+				'price'        => '1.10',
+				'purchase_key' => $key,
+				'user_email'   => $email,
+				'user_info'    => array(
+					'id'    => $user,
+					'email' => $email,
+				),
+			)
+		);
+		remove_filter( 'pre_http_request', $filter, 10 );
+		$this->assertInstanceOf( WP_Error::class, $failed );
+		$this->assertSame( 'USDC checkout could not be started. Please try again or choose another payment method. No payment confirmation has been recorded.', $failed->get_error_message() );
+		$this->assertSame( 30, $timeout );
+		$this->assertSame( Gateway::ID, edd_get_order( $order_id )->gateway );
+		$diag = get_option( Checkout_Diag::OPTION );
+		$this->assertSame( 'api', $diag['stage'] );
+		$this->assertSame( 'COMMERCE_REDIRECT_URL_INVALID', $diag['detail'] );
+		$this->assertSame( 422, (int) $diag['http'] );
+		$encoded = wp_json_encode( $diag );
+		$this->assertStringNotContainsString( $secret, $encoded );
+		$this->assertStringNotContainsString( 'flk_live_', $encoded );
+		$this->assertStringNotContainsString( $email, $encoded );
+		$this->assertStringNotContainsString( $key, $encoded );
+		$sent = json_decode( $body, true );
+		$this->assertSame( '1.10', $sent['amount'] );
+		$this->assertSame( 'USD', $sent['currency'] );
+		$this->assertSame( 'edd-' . $order_id, $sent['storeOrderId'] );
+		$this->assertStringContainsString( '/wp-json/finlstpa/v1/webhook', $sent['callbackUrl'] );
+		$this->assertArrayNotHasKey( 'user_email', $sent );
+		$this->assertStringNotContainsString( $email, $body );
+		$lines = implode( ' ', Checkout_Diag::preflight() );
+		$this->assertStringContainsString( 'key=live', $lines );
+		$this->assertStringContainsString( 'secret=saved', $lines );
+		$this->assertStringNotContainsString( $secret, $lines );
+		$this->assertStringNotContainsString( 'flk_live_', $lines );
+
+		delete_option( Checkout_Diag::OPTION );
+		$ok = static function ( $pre, $args, $url ) use ( $order_id, $sid, $hosted ) {
+			unset( $args );
+			if ( ! is_string( $url ) || false === strpos( $url, '/api/v1/commerce/sessions' ) || false !== strpos( $url, '/cancel' ) ) {
+				return $pre;
+			}
+			return array(
+				'headers'  => array( 'date' => gmdate( 'D, d M Y H:i:s' ) . ' GMT' ),
+				'body'     => wp_json_encode(
+					array(
+						'success' => true,
+						'data'    => array(
+							'id'           => $sid,
+							'storeOrderId' => 'edd-' . $order_id,
+							'livemode'     => true,
+							'amount'       => '1.10',
+							'currency'     => 'USD',
+							'hostedUrl'    => $hosted,
+							'status'       => 'open',
+						),
+					)
+				),
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+		add_filter( 'pre_http_request', $ok, 10, 3 );
+		$continued = Gateway::prepare(
+			array(
+				'price'        => '1.10',
+				'purchase_key' => $key,
+				'user_email'   => $email,
+			)
+		);
+		remove_filter( 'pre_http_request', $ok, 10 );
+		$this->assertSame( $hosted, $continued );
+		$this->assertSame( Gateway::ID, edd_get_order( $order_id )->gateway );
+		$this->assertFalse( get_option( Checkout_Diag::OPTION ) );
+	}
+
+	/**
+	 * Unresolved official payment hosts do not block the browser. The API stays fail-closed.
+	 *
+	 * @return void
+	 */
+	public function test_unresolved_payment_host_does_not_open_the_api() {
+		$empty = static function ( $addresses, $host ) {
+			if ( in_array( $host, array( 'pay.finlinks.io', 'portal.finlinks.io', 'api.finlinks.io', 'evil.example' ), true ) ) {
+				return array();
+			}
+			return $addresses;
+		};
+		add_filter( 'finlstpa_host_addresses', $empty, 5, 2 );
+		$this->assertFalse( Host_Policy::buyer_redirect_blocked( 'pay.finlinks.io' ) );
+		$this->assertFalse( Host_Policy::buyer_redirect_blocked( 'portal.finlinks.io' ) );
+		$this->assertTrue( Host_Policy::destination_blocked( 'api.finlinks.io' ) );
+		$this->assertTrue( Host_Policy::buyer_redirect_blocked( 'evil.example' ) );
+		$this->assertSame( 'unresolved', Host_Policy::resolution_state( 'pay.finlinks.io' ) );
+		$calls = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$calls ) {
+				$calls++;
+				return new WP_Error( 'finlstpa_test', 'should not run' );
+			}
+		);
+		$blocked = ( new Api_Client( 'https://api.finlinks.io', 'flk_live_' . str_repeat( 'a', 20 ) ) )->get_connection();
+		$this->assertSame( 0, $calls );
+		$this->assertSame( 'blocked_destination', $blocked['code'] );
+		remove_all_filters( 'pre_http_request' );
+		remove_filter( 'finlstpa_host_addresses', $empty, 5 );
+
+		$private = static function ( $addresses, $host ) {
+			if ( 'pay.finlinks.io' === $host ) {
+				return array( '10.1.2.3' );
+			}
+			return $addresses;
+		};
+		add_filter( 'finlstpa_host_addresses', $private, 5, 2 );
+		$this->assertTrue( Host_Policy::buyer_redirect_blocked( 'pay.finlinks.io' ) );
+		$this->assertSame( 'private', Host_Policy::resolution_state( 'pay.finlinks.io' ) );
+		remove_filter( 'finlstpa_host_addresses', $private, 5 );
 	}
 
 	/**

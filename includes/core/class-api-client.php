@@ -58,7 +58,8 @@ final class Api_Client {
 	}
 
 	public function create_session( array $body ) {
-		return $this->request( 'POST', '/api/v1/commerce/sessions', $body );
+		// Same budget as connection verification. Session creation is the checkout call those tools never make.
+		return $this->request( 'POST', '/api/v1/commerce/sessions', $body, 30 );
 	}
 
 	public function get_session( $id, $timeout = null ) {

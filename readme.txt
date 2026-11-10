@@ -4,7 +4,7 @@ Tags: usdc, payments, easy digital downloads, checkout, stablecoin
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -106,6 +106,12 @@ No. Uninstall deletes this plugin's settings, credentials, and operational data.
 * Email: support@finlinks.io
 
 == Changelog ==
+
+= 1.1.1 =
+* Record the stage of a Pay with USDC checkout that does not redirect. The FinLinks USDC screen shows that stage, a short detail token, and the HTTP status. It does not show the API key, webhook secret, buyer email, or payment key.
+* Continue an in-progress order that still has the previous gateway id.
+* Do not treat an unresolved official payment host as a private redirect. A private or reserved answer is still refused. API calls still stop when the API host does not resolve.
+* Allow checkout session creation the same 30 seconds already used for store verification.
 
 = 1.1.0 =
 * Use the finlstpa prefix for plugin hooks, options, scheduled tasks, and order meta.

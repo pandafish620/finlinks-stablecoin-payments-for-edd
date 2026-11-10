@@ -126,15 +126,49 @@ final class Settings {
 	 * @return bool
 	 */
 	public static function url_ok( $url, $query = true ) {
-		if ( ! is_string( $url ) || preg_match( '/[\x00-\x20\x7f\\\\]/', $url ) ) {
-			return false;
+		return '' === self::url_problem( $url, $query );
+	}
+
+	/**
+	 * Why a store URL cannot be sent, or '' when it can.
+	 *
+	 * The result is a short token. It does not include the URL, a query string, or a buyer identifier.
+	 *
+	 * @param string $url   URL.
+	 * @param bool   $query Whether a query string is allowed.
+	 * @return string
+	 */
+	public static function url_problem( $url, $query = true ) {
+		if ( ! is_string( $url ) || '' === $url ) {
+			return 'empty';
+		}
+		if ( preg_match( '/[\x00-\x20\x7f\\\\]/', $url ) ) {
+			return 'invalid_characters';
 		}
 		$parts = wp_parse_url( $url );
-		$home  = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
-		return is_array( $parts ) && isset( $parts['scheme'], $parts['host'] ) && 'https' === strtolower( $parts['scheme'] )
-			&& is_string( $home ) && strtolower( $parts['host'] ) === strtolower( $home )
-			&& ! isset( $parts['user'] ) && ! isset( $parts['pass'] )
-			&& ! isset( $parts['port'] ) && ! isset( $parts['fragment'] ) && ( $query || ! isset( $parts['query'] ) );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
+			return 'unparsed';
+		}
+		if ( 'https' !== strtolower( (string) $parts['scheme'] ) ) {
+			return 'not_https';
+		}
+		$home = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+		if ( ! is_string( $home ) || strtolower( (string) $parts['host'] ) !== strtolower( $home ) ) {
+			return 'host_mismatch';
+		}
+		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return 'userinfo';
+		}
+		if ( isset( $parts['port'] ) ) {
+			return 'port';
+		}
+		if ( isset( $parts['fragment'] ) ) {
+			return 'fragment';
+		}
+		if ( ! $query && isset( $parts['query'] ) ) {
+			return 'query';
+		}
+		return '';
 	}
 
 	/**
@@ -344,6 +378,7 @@ final class Settings {
 		}
 		echo '<p>' . esc_html__( 'Use a FinLinks connection for this store with Easy Digital Downloads in Live mode. Enable FinLinks USDC separately under Downloads → Settings → Payments. Do not turn on EDD Test mode, and do not enter a custom API URL.', 'finlinks-stablecoin-payments-for-edd' ) . '</p>';
 		echo '<p>' . esc_html__( 'Webhook URL:', 'finlinks-stablecoin-payments-for-edd' ) . ' <code>' . esc_html( self::webhook_url() ) . '</code></p>';
+		Checkout_Diag::render();
 		if ( '1' !== get_option( Bootstrap::DB_OPTION ) ) {
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'The webhook event table is unavailable. Payments stay disabled until database setup succeeds.', 'finlinks-stablecoin-payments-for-edd' ) . '</p></div>';
 		}
