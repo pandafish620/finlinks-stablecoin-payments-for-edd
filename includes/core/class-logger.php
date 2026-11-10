@@ -2,14 +2,14 @@
 /**
  * Redacting logger. Never writes API keys, secrets, signatures or order keys (§8.4).
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
-final class Finlinks_Logger {
+final class Logger {
 
 	/**
 	 * New API key and webhook secret held for this request. Not saved yet.
@@ -90,7 +90,10 @@ final class Finlinks_Logger {
 	}
 
 	/**
-	 * Log when debug logging is enabled (errors are always logged).
+	 * Log only when the merchant turned on redacted diagnostics.
+	 *
+	 * Errors are not written unless that setting is on, so secrets cannot land
+	 * in the log from a default installation.
 	 *
 	 * @param string $message Message.
 	 * @param string $level   PSR level.
@@ -99,6 +102,6 @@ final class Finlinks_Logger {
 		if ( ! function_exists( 'edd_debug_log' ) || 'yes' !== Settings::get( 'debug' ) ) {
 			return;
 		}
-		edd_debug_log( '[FinLinks EDD][' . sanitize_key( $level ) . '] ' . self::redact( $message ), true );
+		edd_debug_log( '[finlstpa][' . sanitize_key( $level ) . '] ' . self::redact( $message ), true );
 	}
 }

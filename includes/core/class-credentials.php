@@ -2,17 +2,17 @@
 /**
  * API key and webhook secret rules. Pure PHP, no WordPress.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Save-time and runtime checks for the gateway credentials.
  */
-final class Finlinks_Credentials {
+final class Credentials {
 
 	/**
 	 * Why this value must not be saved, or '' when it may be saved.

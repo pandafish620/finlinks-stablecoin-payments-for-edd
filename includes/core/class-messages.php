@@ -6,17 +6,17 @@
  * Admin text is chosen from the error code. Callers must not pass cURL
  * strings or response bodies into these methods.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Mapped messages.
  */
-final class Finlinks_Messages {
+final class Messages {
 
 	/**
 	 * Buyer-facing message for an API error code.
@@ -200,7 +200,7 @@ final class Finlinks_Messages {
 		$v = $data['httpStatus'];
 		if ( is_int( $v ) ) {
 			$n = $v;
-		} elseif ( is_float( $v ) && $v === floor( $v ) ) {
+		} elseif ( is_float( $v ) && floor( $v ) === $v ) {
 			$n = (int) $v;
 		} elseif ( is_string( $v ) && 1 === preg_match( '/^[1-5][0-9]{2}$/', $v ) ) {
 			$n = (int) $v;

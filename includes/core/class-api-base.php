@@ -7,17 +7,17 @@
  * Test mode never calls the production host. It uses only an explicit https
  * override, so this build does not embed another environment's API host.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * API base resolution.
  */
-final class Finlinks_Api_Base {
+final class Api_Base {
 
 	const PROD = 'https://api.finlinks.io';
 
@@ -127,7 +127,7 @@ final class Finlinks_Api_Base {
 		if ( null === $p ) {
 			return false;
 		}
-		if ( 'https' !== $p['scheme'] || '' === $p['host'] ) {
+		if ( 'https' !== $p['scheme'] || '' === $p['host'] || Host_Policy::is_blocked( $p['host'] ) ) {
 			return false;
 		}
 		return ! $p['user'] && ! $p['pass'] && ! $p['query'];

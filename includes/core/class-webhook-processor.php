@@ -2,17 +2,17 @@
 /**
  * Webhook receiver logic (contract §4.2, §7). Framework-free so it can be unit tested.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Verifies, de-duplicates and dispatches one webhook delivery.
  */
-final class Finlinks_Webhook_Processor {
+final class Webhook_Processor {
 
 	/** Session handler results. */
 	const HANDLED = 'handled';
@@ -25,7 +25,7 @@ final class Finlinks_Webhook_Processor {
 	/** @var string Second secret accepted while a rotation is pending. */
 	private $alt_secret;
 
-	/** @var Finlinks_Event_Store */
+	/** @var Event_Claim_Store */
 	private $store;
 
 	/** @var callable(array):string */
@@ -41,14 +41,14 @@ final class Finlinks_Webhook_Processor {
 	 * Constructor.
 	 *
 	 * @param string               $secret          Webhook signing secret ('' when not configured).
-	 * @param Finlinks_Event_Store $store           Processed-event store.
+	 * @param Event_Claim_Store $store           Processed-event store.
 	 * @param callable             $session_handler Receives the decoded payload of a payment_session.* event,
 	 *                                              must confirm by GET and return HANDLED, IGNORED or RETRY.
 	 * @param callable|null        $clock           Returns unix time.
 	 * @param callable|null        $on_stale        Receives the timestamp of a signed but stale event.
 	 * @param string               $alt_secret      Pending webhook secret. Empty when no rotation is pending.
 	 */
-	public function __construct( $secret, Finlinks_Event_Store $store, callable $session_handler, $clock = null, $on_stale = null, $alt_secret = '' ) {
+	public function __construct( $secret, Event_Claim_Store $store, callable $session_handler, $clock = null, $on_stale = null, $alt_secret = '' ) {
 		$this->secret          = (string) $secret;
 		$this->alt_secret      = (string) $alt_secret;
 		$this->store           = $store;
@@ -78,7 +78,7 @@ final class Finlinks_Webhook_Processor {
 			// Not configured yet: retryable, so events are not lost while the merchant finishes setup.
 			return array( 503, array( 'error' => 'not_configured' ) );
 		}
-		if ( Finlinks_Signature::STALE === $result ) {
+		if ( Signature::STALE === $result ) {
 			// Correctly signed but outside the 5-minute window: most likely clock skew on one side.
 			// Not processed, and not a 4xx (which is permanent, §16.5). 503 lets the service retry
 			// with a fresh timestamp; the backup poll (GET session) recovers it in any case.
@@ -87,7 +87,7 @@ final class Finlinks_Webhook_Processor {
 			}
 			return array( 503, array( 'error' => $result ) );
 		}
-		if ( Finlinks_Signature::OK !== $result ) {
+		if ( Signature::OK !== $result ) {
 			return array( 401, array( 'error' => $result ) );
 		}
 
@@ -104,10 +104,13 @@ final class Finlinks_Webhook_Processor {
 		}
 
 		$type = $payload['type'];
+		if ( ! preg_match( '/^[A-Za-z0-9._]{1,64}$/', $type ) ) {
+			return array( 400, array( 'error' => 'invalid_event_type' ) );
+		}
 
 		if ( 'connection.verify' === $type ) {
 			$challenge = self::find_challenge( $payload );
-			if ( null === $challenge ) {
+			if ( null === $challenge || strlen( $challenge ) > 512 || preg_match( '/[\x00-\x1F\x7F]/', $challenge ) ) {
 				return array( 400, array( 'error' => 'missing_challenge' ) );
 			}
 			return array( 200, array( 'challenge' => $challenge ) );
@@ -160,16 +163,16 @@ final class Finlinks_Webhook_Processor {
 		}
 		$timestamp = isset( $h['finlinks-timestamp'] ) ? $h['finlinks-timestamp'] : null;
 		$signature = isset( $h['finlinks-signature'] ) ? $h['finlinks-signature'] : null;
-		$result    = Finlinks_Signature::MISSING;
+		$result    = Signature::MISSING;
 		foreach ( $secrets as $secret ) {
-			$result = Finlinks_Signature::verify(
+			$result = Signature::verify(
 				$secret,
 				$timestamp,
 				$signature,
 				$raw_body,
 				(int) call_user_func( $this->clock )
 			);
-			if ( Finlinks_Signature::BAD_SIGNATURE !== $result ) {
+			if ( Signature::BAD_SIGNATURE !== $result ) {
 				return $result;
 			}
 		}

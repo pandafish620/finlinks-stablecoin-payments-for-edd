@@ -1,1 +1,4 @@
 /dist/
+/vendor/
+.phpunit.result.cache
+phpcs.xml

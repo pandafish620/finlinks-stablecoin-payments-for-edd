@@ -2,14 +2,14 @@
 /**
  * Session expiry vs stock hold (§16.7) and clock-skew math (§16.5). Pure PHP, no WordPress.
  *
- * @package FinLinks\EDD
+ * @package Finlstpa\EDD
  */
 
-namespace FinLinks\EDD;
+namespace Finlstpa\EDD;
 
 defined( 'ABSPATH' ) || exit;
 
-final class Finlinks_Timing {
+final class Timing {
 
 	const MAX_EXPIRY    = 3600;
 	const MIN_EXPIRY    = 900;
